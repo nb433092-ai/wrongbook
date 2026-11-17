@@ -116,6 +116,9 @@ input[type=file]{padding:8px;background:#fafafa}
 .detail-img{width:100%;border-radius:12px;border:1px solid var(--line);margin:10px 0;display:block;cursor:zoom-in}
 .actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
 .actions .btn{flex:1;min-width:96px;text-align:center}
+.checks{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:240px;overflow:auto;background:#fafafa}
+.check{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);margin:0;cursor:pointer}
+.check input{width:auto;margin:0;flex:none}
 .preview{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line)}
 
 /* 提示条 */
@@ -175,6 +178,7 @@ input[type=file]{padding:8px;background:#fafafa}
 
   function friendly(err) {
     var m = (err && err.message) ? err.message : String(err);
+    if (m.indexOf('NO_STUDENTS') >= 0) return '至少选一个学生';
     if (m.indexOf('TOO_MANY_ATTEMPTS') >= 0) return '错太多次了，等 10 分钟再试';
     if (m.indexOf('OLD_PIN_WRONG') >= 0) return '原口令不对';
     if (m.indexOf('PIN_TOO_SHORT') >= 0) return '新口令至少 4 位';
@@ -505,6 +509,7 @@ input[type=file]{padding:8px;background:#fafafa}
     var html = '';
     html += '<div class="topbar"><div><strong>教师端</strong></div>';
     html += '<div class="right">';
+    html += '<button class="btn tiny primary" data-action="bulk-add">批量加题</button>';
     html += '<button class="btn tiny" data-action="new-student">新建学生</button>';
     html += '<button class="btn tiny" data-action="logout">退出</button>';
     html += '</div></div>';
@@ -609,6 +614,9 @@ input[type=file]{padding:8px;background:#fafafa}
       html += '<button class="btn" data-action="set-status" data-id="' + q.id + '" data-status="复习中">标复习中</button>';
       html += '<button class="btn primary" data-action="set-status" data-id="' + q.id + '" data-status="已掌握">标已掌握</button>';
       html += '</div>';
+      html += '<div class="actions" style="margin-top:8px">';
+      html += '<button class="btn danger" data-action="del-q" data-id="' + q.id + '">删除这道题</button>';
+      html += '</div>';
     }
 
     showModal(html);
@@ -620,10 +628,18 @@ input[type=file]{padding:8px;background:#fafafa}
   }
 
   // ====== 新增错题 ======
-  function openAddForm(targetStudentId) {
+  function openAddForm(targetIds) {
     var isStudent = S.role === 'student';
-    var ownerId = isStudent ? (S.profile && S.profile.student_id) : targetStudentId;
-    if (!ownerId) { toast('缺少学生身份，请重新登录', 'err'); return; }
+    var preselect = [];
+    if (!isStudent) {
+      if (Array.isArray(targetIds)) preselect = targetIds.map(Number);
+      else if (targetIds) preselect = [Number(targetIds)];
+    }
+    var ownerId = isStudent ? (S.profile && S.profile.student_id) : (preselect[0] || 't');
+    if (!isStudent && !(S.students || []).length) {
+      toast('还没有学生，先建一个学生', 'err');
+      return;
+    }
 
     var errOptions = ['概念不清', '公式记错', '计算失误', '审题偏差', '思路缺失', '其他'].map(function (v) {
       return '<option value="' + v + '">' + v + '</option>';
@@ -632,9 +648,21 @@ input[type=file]{padding:8px;background:#fafafa}
       return '<option value="' + v + '">' + v + '</option>';
     }).join('');
 
+    var checks = '';
+    if (!isStudent) {
+      checks += '<label>加到哪些学生（可多选，每个学生各存一份）</label><div class="checks" id="studentChecks">';
+      (S.students || []).forEach(function (st) {
+        var on = preselect.indexOf(Number(st.id)) >= 0;
+        checks += '<label class="check"><input type="checkbox" name="sid" value="' + st.id + '"' + (on ? ' checked' : '') + '>' +
+          esc(st.code) + (st.name ? ' ' + esc(st.name) : '') + '</label>';
+      });
+      checks += '</div>';
+    }
+
     var html = '';
     html += '<div class="modal-head"><h3>记一道错题</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
     html += '<form id="addForm" autocomplete="off">';
+    html += checks;
     html += '<label>题目照片（可选）</label><input type="file" name="photo" accept="image/*">';
     html += '<div id="photoPreview"></div>';
     html += '<label>题干</label><textarea name="stem" rows="3" placeholder="文字题干，只拍照不写也行"></textarea>';
@@ -677,6 +705,13 @@ input[type=file]{padding:8px;background:#fafafa}
 
       if (!data.stem && !file) { toast('至少要有题干或一张照片', 'err'); return; }
 
+      var ids = [];
+      if (!isStudent) {
+        var picked = form.querySelectorAll('input[name=sid]:checked');
+        for (var i = 0; i < picked.length; i++) ids.push(Number(picked[i].value));
+        if (!ids.length) { toast('至少选一个学生', 'err'); return; }
+      }
+
       btn.disabled = true;
       btn.textContent = file ? '正在压缩图片…' : '保存中…';
 
@@ -695,18 +730,60 @@ input[type=file]{padding:8px;background:#fafafa}
         if (isStudent) {
           return rpc('add_my_question', { p_token: S.token, p_data: data });
         }
-        return rpc('teacher_add_question', { p_token: S.token, p_student_id: targetStudentId, p_data: data });
+        return rpc('teacher_add_question_many', { p_token: S.token, p_student_ids: ids, p_data: data });
       }).then(function () {
         closeModal();
         return refreshCurrent();
       }).then(function () {
-        toast('已保存');
+        toast(isStudent ? '已保存' : ('已加到 ' + ids.length + ' 个学生'));
       }).catch(function (err) {
         toast(friendly(err), 'err');
         var b = document.getElementById('addSubmit');
         if (b) { b.disabled = false; b.textContent = '保存'; }
       });
     });
+  }
+
+  function qById(id) {
+    for (var i = 0; i < (S.questions || []).length; i++) {
+      if (S.questions[i].id === id) return S.questions[i];
+    }
+    return null;
+  }
+
+  function openDeleteConfirm(q) {
+    var peek = q.stem ? String(q.stem).slice(0, 60) : '（图片题，没有文字题干）';
+    var html = '';
+    html += '<div class="modal-head"><h3>删除这道题</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<p>确定要删？删掉之后恢复不了。</p>';
+    html += '<p class="muted small">' + esc(peek) + '</p>';
+    html += '<div class="actions">';
+    html += '<button class="btn" data-action="close-modal">取消</button>';
+    html += '<button class="btn danger" data-action="del-q-confirm" data-id="' + q.id + '">确认删除</button>';
+    html += '</div>';
+    showModal(html);
+  }
+
+  function deleteImage(path) {
+    if (!path) return;
+    fetch(SUPABASE_URL + '/storage/v1/object/' + BUCKET + '/' + path, {
+      method: 'DELETE',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    }).then(function () {}).catch(function () {});
+  }
+
+  function doDeleteQuestion(id) {
+    rpc('teacher_delete_question', { p_token: S.token, p_id: id })
+      .then(function (d) {
+        if (d && d.ok) {
+          if (d.image_path && Number(d.refs) === 0) deleteImage(d.image_path);
+          closeModal();
+          return refreshCurrent();
+        }
+        throw new Error((d && d.error) || 'FAILED');
+      })
+      .then(function () { toast('已删除'); })
+      .catch(function (err) { toast(friendly(err), 'err'); });
   }
 
   // ====== 学生改自己的口令 ======
@@ -884,8 +961,11 @@ input[type=file]{padding:8px;background:#fafafa}
         openAddForm(sid ? Number(sid) : null);
         return;
       }
+      if (a === 'bulk-add') { openAddForm([]); return; }
       if (a === 'review') { doReview(el.getAttribute('data-id'), el.getAttribute('data-result')); return; }
       if (a === 'set-status') { doSetStatus(el.getAttribute('data-id'), el.getAttribute('data-status')); return; }
+      if (a === 'del-q') { var dq = qById(el.getAttribute('data-id')); if (dq) openDeleteConfirm(dq); return; }
+      if (a === 'del-q-confirm') { doDeleteQuestion(el.getAttribute('data-id')); return; }
       if (a === 'change-pin') { openChangePin(); return; }
       if (a === 'new-student') { openNewStudent(); return; }
       if (a === 'reset-pin') { openResetPin(el.getAttribute('data-id'), el.getAttribute('data-code')); return; }
