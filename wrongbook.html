@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>错题集</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --line:#e5e7eb; --text:#1f2937; --muted:#6b7280;
+  --primary:#2563eb; --danger:#dc2626; --warn:#d97706; --ok:#15803d;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:16px; line-height:1.55; -webkit-text-size-adjust:100%;
+}
+button{font-family:inherit}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.wrap{padding:16px 16px 96px;max-width:760px;margin:0 auto}
+
+/* 顶栏 */
+.topbar{
+  position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+  gap:8px;padding:12px 16px;background:#fff;border-bottom:1px solid var(--line);
+  padding-top:calc(12px + env(safe-area-inset-top));
+}
+.topbar .right{display:flex;gap:8px;align-items:center}
+
+/* 按钮 */
+.btn{
+  border:1px solid var(--line);background:#fff;color:var(--text);
+  padding:9px 14px;border-radius:10px;font-size:15px;cursor:pointer;line-height:1.2;
+}
+.btn:active{transform:translateY(1px)}
+.btn.tiny{padding:7px 11px;font-size:13px;border-radius:9px}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn.block{width:100%;padding:13px;font-size:16px;margin-top:18px}
+.btn:disabled{opacity:.6;cursor:default}
+
+/* 登录 */
+.login-wrap{max-width:420px;margin:0 auto;padding:56px 20px 40px}
+.brand{font-size:30px;margin:0 0 4px;letter-spacing:2px}
+.sub{color:var(--muted);margin:0 0 26px;font-size:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{flex:1;padding:10px;border-radius:10px;border:1px solid var(--line);background:#fff;font-size:15px;cursor:pointer;color:var(--muted)}
+.tab.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.hint{color:var(--danger);font-size:14px;min-height:20px;margin:10px 0 0}
+
+/* 表单 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:14px 0 5px}
+input,select,textarea{
+  width:100%;padding:11px 12px;border:1px solid #d1d5db;border-radius:10px;
+  font-size:16px;background:#fff;color:var(--text);font-family:inherit;
+}
+textarea{resize:vertical;line-height:1.5}
+input[type=file]{padding:8px;background:#fafafa}
+.row2{display:flex;gap:10px}
+.row2>div{flex:1;min-width:0}
+
+/* 统计 */
+.stats{display:flex;gap:10px;margin-bottom:6px}
+.stat{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+.stat b{display:block;font-size:22px;line-height:1.2}
+.stat span{font-size:12px;color:var(--muted)}
+.stat b.warn{color:var(--warn)}
+.stat b.ok{color:var(--ok)}
+
+.sec{font-size:15px;margin:22px 0 10px;color:var(--muted);font-weight:600}
+.empty{color:var(--muted);font-size:14px;padding:22px 12px;text-align:center;background:#fff;border:1px dashed var(--line);border-radius:12px}
+
+/* 错题卡片 */
+.qcard{display:flex;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer}
+.qcard.due{border-color:#f59e0b;box-shadow:0 0 0 1px #f59e0b inset}
+.thumb{width:62px;height:62px;flex:none;border-radius:9px;background:#f0f0f0 center/cover no-repeat}
+.qbody{min-width:0;flex:1}
+.qtext{font-size:15px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.chip{font-size:12px;padding:2px 9px;border-radius:999px;background:#f3f4f6;color:#4b5563;border:1px solid transparent}
+.chip.warn{background:#fef3c7;color:#92400e}
+.chip.ok{background:#dcfce7;color:#166534}
+.chip.bad{background:#fee2e2;color:#991b1b}
+.chip.active{background:var(--primary);color:#fff}
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filters .chip{cursor:pointer;padding:5px 12px}
+
+/* 学生卡片（教师端） */
+.scard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.scard-main{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.scard-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+/* 悬浮按钮 */
+.fab{
+  position:fixed;right:18px;bottom:calc(20px + env(safe-area-inset-bottom));
+  background:var(--primary);color:#fff;border:none;border-radius:999px;
+  padding:14px 20px;font-size:16px;box-shadow:0 6px 20px rgba(37,99,235,.35);cursor:pointer;z-index:30;
+}
+
+/* 弹窗 */
+.modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:60;display:flex;align-items:flex-end;justify-content:center;overflow:auto}
+.modal{background:#fff;width:100%;max-width:760px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+@media(min-width:700px){
+  .modal-backdrop{align-items:center}
+  .modal{border-radius:18px;max-height:86vh}
+}
+.modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;position:sticky;top:-16px;background:#fff;padding:6px 0}
+.modal-head h3{margin:0;font-size:17px}
+.dl{margin:12px 0}
+.dl .k{font-size:12px;color:var(--muted);margin-bottom:2px}
+.dl .v{font-size:15px;white-space:pre-wrap;word-break:break-word}
+.detail-img{width:100%;border-radius:12px;border:1px solid var(--line);margin:10px 0;display:block;cursor:zoom-in}
+.actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
+.actions .btn{flex:1;min-width:96px;text-align:center}
+.preview{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line)}
+
+/* 提示条 */
+.toast{
+  position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);
+  background:#111827;color:#fff;padding:11px 18px;border-radius:12px;font-size:14px;
+  opacity:0;pointer-events:none;transition:.22s;z-index:90;max-width:86vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:#991b1b}
+.loading{text-align:center;color:var(--muted);padding:80px 0}
+.busy{opacity:.55;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ====== 配置（anon key 按设计可公开，数据库已锁死，只开放受控函数）======
+  var SUPABASE_URL = 'https://enkviivlgitreghpmavn.supabase.co';
+  var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVua3ZpaXZsZ2l0cmVnaHBtYXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5MDEyNDEsImV4cCI6MjExMDQ3NzI0MX0.Lt_YIJZb2iDB5UdI7aHrKpeotnuVqLhrIzGhmt6Io3o';
+  var BUCKET = 'wrongbook-images';
+
+  var app = document.getElementById('app');
+
+  var S = {
+    token: null, role: null, profile: null,
+    questions: [], students: [],
+    view: 'login',
+    teacherStudentId: null,
+    filterStatus: 'all',
+    loginRole: 'student'
+  };
+
+  // ====== 基础工具 ======
+  function esc(v) {
+    if (v === null || v === undefined) return '';
+    return String(v).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function todayStr() {
+    var d = new Date();
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  function imgUrl(path) {
+    if (!path) return '';
+    if (/^https?:/i.test(path)) return path;
+    return SUPABASE_URL + '/storage/v1/object/public/' + BUCKET + '/' + path;
+  }
+
+  function friendly(err) {
+    var m = (err && err.message) ? err.message : String(err);
+    if (m.indexOf('TOO_MANY_ATTEMPTS') >= 0) return '错太多次了，等 10 分钟再试';
+    if (m.indexOf('LOGIN_FAILED') >= 0) return '学号或口令不对';
+    if (m.indexOf('SESSION_INVALID') >= 0) return '登录已过期，请重新登录';
+    if (m.indexOf('NOT_FOUND') >= 0) return '找不到这条记录';
+    if (m.indexOf('duplicate key') >= 0) return '这个学号已经存在';
+    if (m.indexOf('Failed to fetch') >= 0) return '连不上服务器，检查一下网络';
+    return m;
+  }
+
+  var toastTimer = null;
+  function toast(msg, type) {
+    var el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.className = 'toast show ' + (type || '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = 'toast'; }, 2600);
+  }
+
+  // ====== 与 Supabase 通信 ======
+  function rpc(fn, args) {
+    return fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(args || {})
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (e) { data = text; }
+        if (!res.ok) {
+          var msg = (data && (data.message || data.hint || data.error_description || data.error)) || ('HTTP ' + res.status);
+          throw new Error(msg);
+        }
+        if (data && data.ok === false) {
+          throw new Error(data.error || 'FAILED');
+        }
+        return data;
+      });
+    });
+  }
+
+  function loadImage(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function (e) { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      img.src = url;
+    });
+  }
+
+  function compressImage(file, maxSide, quality) {
+    maxSide = maxSide || 1600;
+    quality = quality || 0.75;
+    return loadImage(file).then(function (img) {
+      var w = img.naturalWidth, h = img.naturalHeight;
+      var scale = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * scale); h = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      return new Promise(function (resolve, reject) {
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob); else reject(new Error('图片压缩失败'));
+        }, 'image/jpeg', quality);
+      });
+    });
+  }
+
+  function uploadImage(blob, ownerId) {
+    var name = ownerId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+    return fetch(SUPABASE_URL + '/storage/v1/object/' + BUCKET + '/' + name, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'false'
+      },
+      body: blob
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.text().then(function (t) { throw new Error('图片上传失败：' + t); });
+      }
+      return name;
+    });
+  }
+
+  // ====== 登录态 ======
+  function saveAuth(token, role, profile) {
+    S.token = token; S.role = role; S.profile = profile;
+    localStorage.setItem('wb_token', token);
+    localStorage.setItem('wb_role', role);
+    localStorage.setItem('wb_profile', JSON.stringify(profile || {}));
+  }
+  function clearAuth() {
+    S.token = null; S.role = null; S.profile = null;
+    localStorage.removeItem('wb_token');
+    localStorage.removeItem('wb_role');
+    localStorage.removeItem('wb_profile');
+  }
+  function loadAuth() {
+    S.token = localStorage.getItem('wb_token');
+    S.role = localStorage.getItem('wb_role');
+    try { S.profile = JSON.parse(localStorage.getItem('wb_profile') || 'null'); } catch (e) { S.profile = null; }
+  }
+
+  // ====== 弹窗 ======
+  function closeModal() {
+    var m = document.getElementById('modalBackdrop');
+    if (m) m.remove();
+    document.body.style.overflow = '';
+  }
+  function showModal(inner) {
+    closeModal();
+    var wrap = document.createElement('div');
+    wrap.className = 'modal-backdrop';
+    wrap.id = 'modalBackdrop';
+    wrap.innerHTML = '<div class="modal">' + inner + '</div>';
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) closeModal(); });
+    document.body.appendChild(wrap);
+    document.body.style.overflow = 'hidden';
+    return wrap;
+  }
+
+  // ====== 数据加载 ======
+  function loadStudentData() {
+    return rpc('my_questions', { p_token: S.token }).then(function (d) {
+      S.questions = d || [];
+    });
+  }
+  function loadTeacherData() {
+    return rpc('teacher_students', { p_token: S.token }).then(function (d) {
+      S.students = d || [];
+      return rpc('teacher_questions', { p_token: S.token, p_student_id: null });
+    }).then(function (d) {
+      S.questions = d || [];
+    });
+  }
+  function loadTeacherQuestions(studentId) {
+    return rpc('teacher_questions', { p_token: S.token, p_student_id: studentId }).then(function (d) {
+      S.questions = d || [];
+    });
+  }
+  function refreshCurrent() {
+    if (S.view === 'student') {
+      return loadStudentData().then(render);
+    }
+    if (S.view === 'teacher') {
+      return loadTeacherData().then(render);
+    }
+    if (S.view === 'teacherStudent') {
+      return loadTeacherQuestions(S.teacherStudentId).then(render);
+    }
+    return Promise.resolve();
+  }
+
+  // ====== 渲染：登录 ======
+  function renderLogin() {
+    app.innerHTML =
+      '<div class="login-wrap">' +
+        '<h1 class="brand">错题集</h1>' +
+        '<p class="sub">刘秀物理 · 记录错题，按计划复习</p>' +
+        '<div class="tabs">' +
+          '<button class="tab ' + (S.loginRole === 'student' ? 'active' : '') + '" data-action="login-tab" data-role="student">学生登录</button>' +
+          '<button class="tab ' + (S.loginRole === 'teacher' ? 'active' : '') + '" data-action="login-tab" data-role="teacher">教师登录</button>' +
+        '</div>' +
+        '<form id="loginForm" class="card" autocomplete="off">' +
+          '<div id="studentFields" style="' + (S.loginRole === 'student' ? '' : 'display:none') + '">' +
+            '<label>学号</label><input name="code" placeholder="例如 S01" autocapitalize="characters">' +
+            '<label>口令</label><input name="pin" type="password" inputmode="numeric" placeholder="老师给你的 4 位数字">' +
+          '</div>' +
+          '<div id="teacherFields" style="' + (S.loginRole === 'teacher' ? '' : 'display:none') + '">' +
+            '<label>教师口令</label><input name="password" type="password" placeholder="教师口令">' +
+          '</div>' +
+          '<button class="btn primary block" type="submit">登录</button>' +
+          '<p class="hint" id="loginHint"></p>' +
+        '</form>' +
+      '</div>';
+
+    var form = document.getElementById('loginForm');
+    form.addEventListener('submit', onLoginSubmit);
+  }
+
+  function switchLoginRole(role) {
+    S.loginRole = role;
+    var tabs = document.querySelectorAll('.tab');
+    for (var i = 0; i < tabs.length; i++) {
+      tabs[i].classList.toggle('active', tabs[i].getAttribute('data-role') === role);
+    }
+    var sf = document.getElementById('studentFields');
+    var tf = document.getElementById('teacherFields');
+    if (sf) sf.style.display = (role === 'student' ? '' : 'none');
+    if (tf) tf.style.display = (role === 'teacher' ? '' : 'none');
+    var hint = document.getElementById('loginHint');
+    if (hint) hint.textContent = '';
+  }
+
+  function onLoginSubmit(e) {
+    e.preventDefault();
+    var form = e.target;
+    var hint = document.getElementById('loginHint');
+    var btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    hint.textContent = '';
+
+    var done = function () { btn.disabled = false; };
+    var fail = function (err) { hint.textContent = friendly(err); done(); };
+
+    if (S.loginRole === 'student') {
+      var code = (form.code.value || '').trim();
+      var pin = (form.pin.value || '').trim();
+      if (!code || !pin) { fail(new Error('学号和口令都要填')); return; }
+      rpc('student_login', { p_code: code, p_pin: pin }).then(function (d) {
+        saveAuth(d.token, 'student', d);
+        S.view = 'student';
+        return loadStudentData();
+      }).then(function () {
+        render();
+      }).catch(fail);
+    } else {
+      var pw = form.password.value || '';
+      if (!pw) { fail(new Error('口令不能为空')); return; }
+      rpc('teacher_login', { p_password: pw }).then(function (d) {
+        saveAuth(d.token, 'teacher', d);
+        S.view = 'teacher';
+        return loadTeacherData();
+      }).then(function () {
+        render();
+      }).catch(fail);
+    }
+  }
+
+  // ====== 渲染：错题卡片 ======
+  function statusClass(st) {
+    if (st === '已掌握') return 'ok';
+    if (st === '未掌握') return 'bad';
+    return '';
+  }
+
+  function questionCard(q, highlight) {
+    var due = q.status !== '已掌握' && q.next_review_on && q.next_review_on <= todayStr();
+    var html = '<div class="qcard' + ((highlight || due) ? ' due' : '') + '" data-action="open-q" data-id="' + q.id + '">';
+    if (q.image_path) {
+      html += '<div class="thumb" style="background-image:url(&quot;' + esc(imgUrl(q.image_path)) + '&quot;)"></div>';
+    }
+    html += '<div class="qbody">';
+    html += '<div class="qtext">' + esc(q.stem || '（只有图片，没有文字题干）') + '</div>';
+    html += '<div class="chips">';
+    html += '<span class="chip ' + statusClass(q.status) + '">' + esc(q.status) + '</span>';
+    if (q.error_type) html += '<span class="chip">' + esc(q.error_type) + '</span>';
+    if (q.level) html += '<span class="chip">' + esc(q.level) + '</span>';
+    if (q.added_by === 'teacher') html += '<span class="chip">老师加</span>';
+    if (due) html += '<span class="chip warn">今天复习</span>';
+    html += '</div></div></div>';
+    return html;
+  }
+
+  // ====== 渲染：学生端 ======
+  function renderStudent() {
+    var qs = (S.questions || []).slice();
+    var today = todayStr();
+    var due = qs.filter(function (q) { return q.status !== '已掌握' && q.next_review_on && q.next_review_on <= today; })
+                .sort(function (a, b) { return String(a.next_review_on).localeCompare(String(b.next_review_on)); });
+
+    var list = qs.slice().sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
+    if (S.filterStatus !== 'all') {
+      list = list.filter(function (q) { return q.status === S.filterStatus; });
+    }
+
+    var name = (S.profile && (S.profile.name || S.profile.code)) || '同学';
+    var code = (S.profile && S.profile.code) || '';
+    var mastered = qs.filter(function (q) { return q.status === '已掌握'; }).length;
+
+    var filters = ['all', '未掌握', '复习中', '已掌握'].map(function (s) {
+      return '<button class="chip ' + (S.filterStatus === s ? 'active' : '') + '" data-action="filter" data-status="' + s + '">' +
+        (s === 'all' ? '全部' : s) + '</button>';
+    }).join('');
+
+    var html = '';
+    html += '<div class="topbar"><div><strong>' + esc(name) + '</strong> <span class="muted small">' + esc(code) + '</span></div>';
+    html += '<div class="right"><button class="btn tiny" data-action="logout">退出</button></div></div>';
+    html += '<div class="wrap">';
+    html += '<div class="stats">';
+    html += '<div class="stat"><b>' + qs.length + '</b><span>错题总数</span></div>';
+    html += '<div class="stat"><b class="warn">' + due.length + '</b><span>今天该复习</span></div>';
+    html += '<div class="stat"><b class="ok">' + mastered + '</b><span>已掌握</span></div>';
+    html += '</div>';
+
+    if (due.length) {
+      html += '<h2 class="sec">今天该复习（' + due.length + '）</h2>';
+      html += due.map(function (q) { return questionCard(q, true); }).join('');
+    } else {
+      html += '<h2 class="sec">今天该复习</h2><div class="empty">今天没有到期的题。</div>';
+    }
+
+    html += '<h2 class="sec">全部错题（' + list.length + '）</h2>';
+    html += '<div class="filters">' + filters + '</div>';
+    html += list.length ? list.map(function (q) { return questionCard(q, false); }).join('')
+                        : '<div class="empty">还没有错题，点右下角「记错题」。</div>';
+    html += '</div>';
+    html += '<button class="fab" data-action="add-q">＋ 记错题</button>';
+
+    app.innerHTML = html;
+  }
+
+  // ====== 渲染：教师端 ======
+  function renderTeacher() {
+    var sts = S.students || [];
+    var total = (S.questions || []).length;
+
+    var html = '';
+    html += '<div class="topbar"><div><strong>教师端</strong></div>';
+    html += '<div class="right">';
+    html += '<button class="btn tiny" data-action="new-student">新建学生</button>';
+    html += '<button class="btn tiny" data-action="logout">退出</button>';
+    html += '</div></div>';
+    html += '<div class="wrap">';
+    html += '<div class="stats">';
+    html += '<div class="stat"><b>' + sts.length + '</b><span>学生数</span></div>';
+    html += '<div class="stat"><b>' + total + '</b><span>错题总数</span></div>';
+    html += '</div>';
+    html += '<h2 class="sec">学生名单</h2>';
+
+    if (!sts.length) {
+      html += '<div class="empty">还没有学生，点右上角「新建学生」。</div>';
+    } else {
+      html += sts.map(function (st) {
+        return '<div class="scard">' +
+          '<div class="scard-main"><strong>' + esc(st.code) + '</strong>' +
+          (st.name ? '<span class="muted">' + esc(st.name) + '</span>' : '') + '</div>' +
+          '<div class="muted small">错题 ' + (st.total || 0) + ' 道 · 待复习 ' + (st.due_count || 0) + ' 道</div>' +
+          '<div class="scard-actions">' +
+            '<button class="btn tiny" data-action="open-student" data-id="' + st.id + '">看错题</button>' +
+            '<button class="btn tiny primary" data-action="add-q" data-student-id="' + st.id + '">加题</button>' +
+            '<button class="btn tiny" data-action="reset-pin" data-id="' + st.id + '" data-code="' + esc(st.code) + '">改口令</button>' +
+          '</div></div>';
+      }).join('');
+    }
+    html += '</div>';
+    app.innerHTML = html;
+  }
+
+  // ====== 渲染：教师看某个学生 ======
+  function renderTeacherStudent() {
+    var st = null;
+    for (var i = 0; i < (S.students || []).length; i++) {
+      if (Number(S.students[i].id) === Number(S.teacherStudentId)) { st = S.students[i]; break; }
+    }
+    var title = st ? (st.code + (st.name ? ' · ' + st.name : '')) : '学生错题';
+    var qs = S.questions || [];
+    var today = todayStr();
+    var due = qs.filter(function (q) { return q.status !== '已掌握' && q.next_review_on && q.next_review_on <= today; });
+
+    var html = '';
+    html += '<div class="topbar">';
+    html += '<button class="btn tiny" data-action="back-teacher">← 返回</button>';
+    html += '<strong>' + esc(title) + '</strong>';
+    html += '<button class="btn tiny primary" data-action="add-q" data-student-id="' + S.teacherStudentId + '">加题</button>';
+    html += '</div>';
+    html += '<div class="wrap">';
+    html += '<div class="stats">';
+    html += '<div class="stat"><b>' + qs.length + '</b><span>错题总数</span></div>';
+    html += '<div class="stat"><b class="warn">' + due.length + '</b><span>待复习</span></div>';
+    html += '<div class="stat"><b class="ok">' + qs.filter(function (q) { return q.status === '已掌握'; }).length + '</b><span>已掌握</span></div>';
+    html += '</div>';
+    html += qs.length ? qs.map(function (q) { return questionCard(q, false); }).join('')
+                      : '<div class="empty">这个学生还没有错题。</div>';
+    html += '</div>';
+    app.innerHTML = html;
+  }
+
+  // ====== 错题详情 ======
+  function openDetail(id) {
+    var q = null;
+    for (var i = 0; i < (S.questions || []).length; i++) {
+      if (S.questions[i].id === id) { q = S.questions[i]; break; }
+    }
+    if (!q) return;
+
+    var row = function (k, v) {
+      if (!v) return '';
+      return '<div class="dl"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>';
+    };
+
+    var html = '';
+    html += '<div class="modal-head"><h3>错题详情</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    if (q.image_path) {
+      html += '<img class="detail-img" src="' + esc(imgUrl(q.image_path)) + '" data-action="zoom-image" data-src="' + esc(imgUrl(q.image_path)) + '" alt="题目图片">';
+    }
+    html += row('题干', q.stem);
+    html += row('我当时写的错误答案', q.my_answer);
+    html += row('正确答案', q.correct_answer);
+    html += row('解析', q.analysis);
+    html += '<div class="chips" style="margin-top:12px">';
+    html += '<span class="chip ' + statusClass(q.status) + '">' + esc(q.status) + '</span>';
+    if (q.error_type) html += '<span class="chip">' + esc(q.error_type) + '</span>';
+    if (q.level) html += '<span class="chip">' + esc(q.level) + '</span>';
+    html += '<span class="chip">已复习 ' + (q.review_count || 0) + ' 次</span>';
+    html += '<span class="chip">下次复习 ' + esc(q.next_review_on || '') + '</span>';
+    if (q.added_by === 'teacher') html += '<span class="chip">老师加</span>';
+    html += '</div>';
+    if (q.chapter || q.section) html += row('章节', [q.chapter, q.section].filter(Boolean).join(' / '));
+    if (q.source) html += row('出处', q.source);
+
+    if (S.role === 'student') {
+      html += '<div class="actions">';
+      html += '<button class="btn" data-action="review" data-id="' + q.id + '" data-result="again">再来一次</button>';
+      html += '<button class="btn" data-action="review" data-id="' + q.id + '" data-result="ok">还行</button>';
+      html += '<button class="btn primary" data-action="review" data-id="' + q.id + '" data-result="mastered">已掌握</button>';
+      html += '</div>';
+      html += '<p class="muted small" style="margin-top:10px">「再来一次」= 还没懂，明天再见；「还行」= 按 1/3/7/15/30 天排下次；「已掌握」= 三个月后再看。</p>';
+    } else {
+      html += '<div class="actions">';
+      html += '<button class="btn" data-action="set-status" data-id="' + q.id + '" data-status="未掌握">标未掌握</button>';
+      html += '<button class="btn" data-action="set-status" data-id="' + q.id + '" data-status="复习中">标复习中</button>';
+      html += '<button class="btn primary" data-action="set-status" data-id="' + q.id + '" data-status="已掌握">标已掌握</button>';
+      html += '</div>';
+    }
+
+    showModal(html);
+  }
+
+  function openImage(src) {
+    showModal('<div class="modal-head"><h3>题目图片</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>' +
+              '<img src="' + esc(src) + '" style="width:100%;border-radius:12px" alt="题目">');
+  }
+
+  // ====== 新增错题 ======
+  function openAddForm(targetStudentId) {
+    var isStudent = S.role === 'student';
+    var ownerId = isStudent ? (S.profile && S.profile.student_id) : targetStudentId;
+    if (!ownerId) { toast('缺少学生身份，请重新登录', 'err'); return; }
+
+    var errOptions = ['概念不清', '公式记错', '计算失误', '审题偏差', '思路缺失', '其他'].map(function (v) {
+      return '<option value="' + v + '">' + v + '</option>';
+    }).join('');
+    var lvlOptions = ['基础', '提升', '拔尖'].map(function (v) {
+      return '<option value="' + v + '">' + v + '</option>';
+    }).join('');
+
+    var html = '';
+    html += '<div class="modal-head"><h3>记一道错题</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="addForm" autocomplete="off">';
+    html += '<label>题目照片（可选）</label><input type="file" name="photo" accept="image/*">';
+    html += '<div id="photoPreview"></div>';
+    html += '<label>题干</label><textarea name="stem" rows="3" placeholder="文字题干，只拍照不写也行"></textarea>';
+    html += '<label>我当时写的错误答案</label><textarea name="my_answer" rows="2" placeholder="越具体越有用"></textarea>';
+    html += '<label>正确答案</label><textarea name="correct_answer" rows="2"></textarea>';
+    html += '<label>解析</label><textarea name="analysis" rows="3" placeholder="为什么错、正确思路是什么"></textarea>';
+    html += '<label>错因</label><select name="error_type"><option value="">未分类</option>' + errOptions + '</select>';
+    html += '<label>难度</label><select name="level"><option value="">未标注</option>' + lvlOptions + '</select>';
+    html += '<div class="row2"><div><label>章节</label><input name="chapter" placeholder="如 力学"></div>';
+    html += '<div><label>小节</label><input name="section" placeholder="如 牛顿第二定律"></div></div>';
+    html += '<label>出处</label><input name="source" placeholder="如 2024 全国甲卷第 18 题">';
+    html += '<button class="btn primary block" type="submit" id="addSubmit">保存</button>';
+    html += '</form>';
+
+    showModal(html);
+
+    var form = document.getElementById('addForm');
+    form.photo.addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      var box = document.getElementById('photoPreview');
+      if (!file) { box.innerHTML = ''; return; }
+      box.innerHTML = '<img class="preview" src="' + URL.createObjectURL(file) + '" alt="预览">';
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('addSubmit');
+      var data = {
+        stem: form.stem.value.trim(),
+        my_answer: form.my_answer.value.trim(),
+        correct_answer: form.correct_answer.value.trim(),
+        analysis: form.analysis.value.trim(),
+        error_type: form.error_type.value,
+        level: form.level.value,
+        chapter: form.chapter.value.trim(),
+        section: form.section.value.trim(),
+        source: form.source.value.trim()
+      };
+      var file = form.photo.files && form.photo.files[0];
+
+      if (!data.stem && !file) { toast('至少要有题干或一张照片', 'err'); return; }
+
+      btn.disabled = true;
+      btn.textContent = file ? '正在压缩图片…' : '保存中…';
+
+      var chain = Promise.resolve();
+      if (file) {
+        chain = compressImage(file).then(function (blob) {
+          btn.textContent = '正在上传图片…';
+          return uploadImage(blob, ownerId);
+        }).then(function (path) {
+          data.image_path = path;
+        });
+      }
+
+      chain.then(function () {
+        btn.textContent = '保存中…';
+        if (isStudent) {
+          return rpc('add_my_question', { p_token: S.token, p_data: data });
+        }
+        return rpc('teacher_add_question', { p_token: S.token, p_student_id: targetStudentId, p_data: data });
+      }).then(function () {
+        closeModal();
+        return refreshCurrent();
+      }).then(function () {
+        toast('已保存');
+      }).catch(function (err) {
+        toast(friendly(err), 'err');
+        var b = document.getElementById('addSubmit');
+        if (b) { b.disabled = false; b.textContent = '保存'; }
+      });
+    });
+  }
+
+  // ====== 新建学生 ======
+  function openNewStudent() {
+    var html = '';
+    html += '<div class="modal-head"><h3>新建学生</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="newStudentForm" autocomplete="off">';
+    html += '<label>学号</label><input name="code" placeholder="如 S01，学生用这个登录">';
+    html += '<label>姓名</label><input name="name" placeholder="只有你自己能看到">';
+    html += '<label>初始口令</label><input name="pin" placeholder="4 位数字">';
+    html += '<button class="btn primary block" type="submit">创建</button>';
+    html += '</form>';
+    showModal(html);
+
+    var form = document.getElementById('newStudentForm');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var code = form.code.value.trim();
+      var name = form.name.value.trim();
+      var pin = form.pin.value.trim();
+      if (!code || !pin) { toast('学号和口令都要填', 'err'); return; }
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('create_student', { p_token: S.token, p_code: code, p_name: name, p_pin: pin })
+        .then(function () {
+          closeModal();
+          return loadTeacherData();
+        })
+        .then(function () {
+          render();
+          toast('已创建 ' + code);
+        })
+        .catch(function (err) {
+          toast(friendly(err), 'err');
+          btn.disabled = false;
+        });
+    });
+  }
+
+  // ====== 重置学生口令 ======
+  function openResetPin(studentId, code) {
+    var html = '';
+    html += '<div class="modal-head"><h3>改 ' + esc(code) + ' 的口令</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="resetForm" autocomplete="off">';
+    html += '<label>新口令（4 位数字）</label><input name="pin" inputmode="numeric">';
+    html += '<button class="btn primary block" type="submit">保存</button>';
+    html += '</form>';
+    showModal(html);
+
+    var form = document.getElementById('resetForm');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pin = form.pin.value.trim();
+      if (!pin) { toast('口令不能为空', 'err'); return; }
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('reset_student_pin', { p_token: S.token, p_student_id: Number(studentId), p_new_pin: pin })
+        .then(function () {
+          closeModal();
+          toast('口令已改，该学生需要重新登录');
+        })
+        .catch(function (err) {
+          toast(friendly(err), 'err');
+          btn.disabled = false;
+        });
+    });
+  }
+
+  // ====== 操作 ======
+  function doLogout() {
+    clearAuth();
+    S.view = 'login';
+    S.questions = [];
+    S.students = [];
+    S.teacherStudentId = null;
+    S.filterStatus = 'all';
+    render();
+    toast('已退出');
+  }
+
+  function doReview(id, result) {
+    rpc('review_question', { p_token: S.token, p_id: id, p_result: result })
+      .then(function () {
+        closeModal();
+        return refreshCurrent();
+      })
+      .then(function () {
+        toast(result === 'mastered' ? '已标记为掌握' : (result === 'again' ? '明天再见' : '已记录，下次按间隔来'));
+      })
+      .catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function doSetStatus(id, status) {
+    rpc('teacher_set_status', { p_token: S.token, p_id: id, p_status: status })
+      .then(function () {
+        closeModal();
+        return refreshCurrent();
+      })
+      .then(function () { toast('已改为 ' + status); })
+      .catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function openStudentView(id) {
+    S.teacherStudentId = id;
+    S.view = 'teacherStudent';
+    loadTeacherQuestions(id).then(render).catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function backToTeacher() {
+    S.view = 'teacher';
+    S.teacherStudentId = null;
+    loadTeacherData().then(render).catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function setFilter(status) {
+    S.filterStatus = status;
+    render();
+  }
+
+  // ====== 事件委托 ======
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('[data-action]') : null;
+    if (!el) return;
+    var a = el.getAttribute('data-action');
+    try {
+      if (a === 'logout') { doLogout(); return; }
+      if (a === 'login-tab') { switchLoginRole(el.getAttribute('data-role')); return; }
+      if (a === 'open-q') { openDetail(el.getAttribute('data-id')); return; }
+      if (a === 'close-modal') { closeModal(); return; }
+      if (a === 'zoom-image') { openImage(el.getAttribute('data-src')); return; }
+      if (a === 'add-q') {
+        var sid = el.getAttribute('data-student-id');
+        openAddForm(sid ? Number(sid) : null);
+        return;
+      }
+      if (a === 'review') { doReview(el.getAttribute('data-id'), el.getAttribute('data-result')); return; }
+      if (a === 'set-status') { doSetStatus(el.getAttribute('data-id'), el.getAttribute('data-status')); return; }
+      if (a === 'new-student') { openNewStudent(); return; }
+      if (a === 'reset-pin') { openResetPin(el.getAttribute('data-id'), el.getAttribute('data-code')); return; }
+      if (a === 'open-student') { openStudentView(Number(el.getAttribute('data-id'))); return; }
+      if (a === 'back-teacher') { backToTeacher(); return; }
+      if (a === 'filter') { setFilter(el.getAttribute('data-status')); return; }
+    } catch (err) {
+      toast(friendly(err), 'err');
+    }
+  });
+
+  // ====== 启动 ======
+  function render() {
+    if (S.view === 'student') return renderStudent();
+    if (S.view === 'teacher') return renderTeacher();
+    if (S.view === 'teacherStudent') return renderTeacherStudent();
+    return renderLogin();
+  }
+
+  function boot() {
+    loadAuth();
+    if (S.token && S.role) {
+      S.view = (S.role === 'teacher') ? 'teacher' : 'student';
+      app.innerHTML = '<div class="loading">加载中…</div>';
+      refreshCurrent().catch(function (err) {
+        if (String(err.message || err).indexOf('SESSION_INVALID') >= 0) {
+          clearAuth();
+          S.view = 'login';
+          render();
+          toast('登录已过期，请重新登录', 'err');
+        } else {
+          S.view = 'login';
+          render();
+          toast(friendly(err), 'err');
+        }
+      });
+    } else {
+      S.view = 'login';
+      render();
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
