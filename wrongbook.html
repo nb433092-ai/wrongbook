@@ -176,6 +176,8 @@ input[type=file]{padding:8px;background:#fafafa}
   function friendly(err) {
     var m = (err && err.message) ? err.message : String(err);
     if (m.indexOf('TOO_MANY_ATTEMPTS') >= 0) return '错太多次了，等 10 分钟再试';
+    if (m.indexOf('OLD_PIN_WRONG') >= 0) return '原口令不对';
+    if (m.indexOf('PIN_TOO_SHORT') >= 0) return '新口令至少 4 位';
     if (m.indexOf('LOGIN_FAILED') >= 0) return '学号或口令不对';
     if (m.indexOf('SESSION_INVALID') >= 0) return '登录已过期，请重新登录';
     if (m.indexOf('NOT_FOUND') >= 0) return '找不到这条记录';
@@ -399,12 +401,15 @@ input[type=file]{padding:8px;background:#fafafa}
       var code = (form.code.value || '').trim();
       var pin = (form.pin.value || '').trim();
       if (!code || !pin) { fail(new Error('学号和口令都要填')); return; }
+      var mustChange = false;
       rpc('student_login', { p_code: code, p_pin: pin }).then(function (d) {
         saveAuth(d.token, 'student', d);
+        mustChange = !!d.must_change_pin;
         S.view = 'student';
         return loadStudentData();
       }).then(function () {
         render();
+        if (mustChange) openChangePin(true);
       }).catch(fail);
     } else {
       var pw = form.password.value || '';
@@ -467,7 +472,7 @@ input[type=file]{padding:8px;background:#fafafa}
 
     var html = '';
     html += '<div class="topbar"><div><strong>' + esc(name) + '</strong> <span class="muted small">' + esc(code) + '</span></div>';
-    html += '<div class="right"><button class="btn tiny" data-action="logout">退出</button></div></div>';
+    html += '<div class="right"><button class="btn tiny" data-action="change-pin">改口令</button><button class="btn tiny" data-action="logout">退出</button></div></div>';
     html += '<div class="wrap">';
     html += '<div class="stats">';
     html += '<div class="stat"><b>' + qs.length + '</b><span>错题总数</span></div>';
@@ -704,6 +709,48 @@ input[type=file]{padding:8px;background:#fafafa}
     });
   }
 
+  // ====== 学生改自己的口令 ======
+  function openChangePin(force) {
+    var html = '';
+    html += '<div class="modal-head"><h3>' + (force ? '第一次登录，请设置自己的口令' : '改我的口令') + '</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    if (force) {
+      html += '<p class="muted small">初始口令是老师统一发的，先改成你自己记得住的。改完别人就猜不到了。</p>';
+    }
+    html += '<form id="cpForm" autocomplete="off">';
+    html += '<label>原口令</label><input name="oldpin" type="password" inputmode="numeric">';
+    html += '<label>新口令（至少 4 位，建议 6 位数字）</label><input name="newpin" type="password" inputmode="numeric">';
+    html += '<label>再输一次新口令</label><input name="newpin2" type="password" inputmode="numeric">';
+    html += '<button class="btn primary block" type="submit">保存</button>';
+    html += '</form>';
+    showModal(html);
+
+    var form = document.getElementById('cpForm');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var a = form.oldpin.value.trim();
+      var b = form.newpin.value.trim();
+      var c = form.newpin2.value.trim();
+      if (!a || !b) { toast('三个框都要填', 'err'); return; }
+      if (b !== c) { toast('两次输入的新口令不一样', 'err'); return; }
+      if (b.length < 4) { toast('新口令至少 4 位', 'err'); return; }
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('change_my_pin', { p_token: S.token, p_old_pin: a, p_new_pin: b })
+        .then(function () {
+          if (S.profile) {
+            S.profile.must_change_pin = false;
+            localStorage.setItem('wb_profile', JSON.stringify(S.profile));
+          }
+          closeModal();
+          toast('口令已改，下次用新口令登录');
+        })
+        .catch(function (err) {
+          toast(friendly(err), 'err');
+          btn.disabled = false;
+        });
+    });
+  }
+
   // ====== 新建学生 ======
   function openNewStudent() {
     var html = '';
@@ -839,6 +886,7 @@ input[type=file]{padding:8px;background:#fafafa}
       }
       if (a === 'review') { doReview(el.getAttribute('data-id'), el.getAttribute('data-result')); return; }
       if (a === 'set-status') { doSetStatus(el.getAttribute('data-id'), el.getAttribute('data-status')); return; }
+      if (a === 'change-pin') { openChangePin(); return; }
       if (a === 'new-student') { openNewStudent(); return; }
       if (a === 'reset-pin') { openResetPin(el.getAttribute('data-id'), el.getAttribute('data-code')); return; }
       if (a === 'open-student') { openStudentView(Number(el.getAttribute('data-id'))); return; }
@@ -862,7 +910,9 @@ input[type=file]{padding:8px;background:#fafafa}
     if (S.token && S.role) {
       S.view = (S.role === 'teacher') ? 'teacher' : 'student';
       app.innerHTML = '<div class="loading">加载中…</div>';
-      refreshCurrent().catch(function (err) {
+      refreshCurrent().then(function () {
+        if (S.role === 'student' && S.profile && S.profile.must_change_pin) openChangePin(true);
+      }).catch(function (err) {
         if (String(err.message || err).indexOf('SESSION_INVALID') >= 0) {
           clearAuth();
           S.view = 'login';
