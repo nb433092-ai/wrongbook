@@ -121,6 +121,10 @@ input[type=file]{padding:8px;background:#fafafa}
 .checks{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:240px;overflow:auto;background:#fafafa}
 .check{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);margin:0;cursor:pointer}
 .check input{width:auto;margin:0;flex:none}
+.crop-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:10px}
+.crop-grid label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:0}
+.crop-grid input[type=range]{flex:1;padding:0}
+.crop-grid .pct{width:34px;text-align:right;font-variant-numeric:tabular-nums}
 .preview{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line)}
 
 /* 提示条 */
@@ -395,6 +399,37 @@ input[type=file]{padding:8px;background:#fafafa}
 
   function newImageBase(ownerId) {
     return ownerId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function cropToCanvas(img, crop, maxSide) {
+    var w = img.naturalWidth || img.width;
+    var h = img.naturalHeight || img.height;
+    var c = crop || { top: 0, bottom: 0, left: 0, right: 0 };
+    var x0 = Math.round(w * (c.left || 0) / 100);
+    var y0 = Math.round(h * (c.top || 0) / 100);
+    var x1 = Math.round(w - w * (c.right || 0) / 100);
+    var y1 = Math.round(h - h * (c.bottom || 0) / 100);
+    var cw = Math.max(16, x1 - x0);
+    var ch = Math.max(16, y1 - y0);
+    var scale = Math.min(1, (maxSide || 1600) / Math.max(cw, ch));
+    var outW = Math.max(1, Math.round(cw * scale));
+    var outH = Math.max(1, Math.round(ch * scale));
+    var canvas = document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, outW, outH);
+    ctx.drawImage(img, x0, y0, cw, ch, 0, 0, outW, outH);
+    return canvas;
+  }
+
+  function canvasToBlob(canvas, quality) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (blob) resolve(blob); else reject(new Error('图片压缩失败'));
+      }, 'image/jpeg', quality || 0.75);
+    });
   }
 
   function uploadFile(blob, name) {
@@ -833,6 +868,16 @@ input[type=file]{padding:8px;background:#fafafa}
       }).join('') +
       '</select>';
     html += '<label>题目照片（可选）</label><input type="file" name="photo" accept="image/*">';
+    html += '<div id="cropBox" style="display:none">';
+    html += '<canvas id="cropPreview" style="width:100%;border-radius:10px;margin-top:10px;border:1px solid #e5e7eb;display:block"></canvas>';
+    html += '<div class="crop-grid">';
+    html += '<label>上 <input type="range" id="crop-top" min="0" max="40" value="0"><span class="pct" id="pct-top">0%</span></label>';
+    html += '<label>下 <input type="range" id="crop-bottom" min="0" max="40" value="0"><span class="pct" id="pct-bottom">0%</span></label>';
+    html += '<label>左 <input type="range" id="crop-left" min="0" max="40" value="0"><span class="pct" id="pct-left">0%</span></label>';
+    html += '<label>右 <input type="range" id="crop-right" min="0" max="40" value="0"><span class="pct" id="pct-right">0%</span></label>';
+    html += '</div>';
+    html += '<div class="muted small" style="margin-top:6px">拖滑块裁掉旁边多余的题，只留要录的这道。<button type="button" class="btn tiny" id="cropReset" style="margin-left:8px">重置</button></div>';
+    html += '</div>';
     html += '<div id="photoPreview"></div>';
     html += '<label>题干</label><textarea name="stem" rows="3" placeholder="文字题干，只拍照不写也行"></textarea>';
     html += '<label>我当时写的错误答案</label><textarea name="my_answer" rows="2" placeholder="越具体越有用"></textarea>';
@@ -885,11 +930,64 @@ input[type=file]{padding:8px;background:#fafafa}
     fillSections();
     refreshLabels();
 
+    var cropState = { top: 0, bottom: 0, left: 0, right: 0 };
+    var imgEl = null;
+
+    function drawCropPreview() {
+      if (!imgEl) return;
+      var c = cropToCanvas(imgEl, cropState, 600);
+      var pv = document.getElementById('cropPreview');
+      if (!pv) return;
+      pv.width = c.width;
+      pv.height = c.height;
+      pv.getContext('2d').drawImage(c, 0, 0);
+    }
+
+    ['top', 'bottom', 'left', 'right'].forEach(function (k) {
+      var sl = document.getElementById('crop-' + k);
+      var pct = document.getElementById('pct-' + k);
+      if (!sl) return;
+      sl.addEventListener('input', function () {
+        cropState[k] = Number(sl.value);
+        if (pct) pct.textContent = sl.value + '%';
+        drawCropPreview();
+      });
+    });
+
+    var resetBtn = document.getElementById('cropReset');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', function () {
+        ['top', 'bottom', 'left', 'right'].forEach(function (k) {
+          cropState[k] = 0;
+          var sl = document.getElementById('crop-' + k);
+          var pct = document.getElementById('pct-' + k);
+          if (sl) sl.value = 0;
+          if (pct) pct.textContent = '0%';
+        });
+        drawCropPreview();
+      });
+    }
+
     form.photo.addEventListener('change', function (e) {
       var file = e.target.files && e.target.files[0];
-      var box = document.getElementById('photoPreview');
-      if (!file) { box.innerHTML = ''; return; }
-      box.innerHTML = '<img class="preview" src="' + URL.createObjectURL(file) + '" alt="预览">';
+      var box = document.getElementById('cropBox');
+      if (!file) {
+        if (box) box.style.display = 'none';
+        imgEl = null;
+        return;
+      }
+      loadImage(file).then(function (img) {
+        imgEl = img;
+        cropState = { top: 0, bottom: 0, left: 0, right: 0 };
+        ['top', 'bottom', 'left', 'right'].forEach(function (k) {
+          var sl = document.getElementById('crop-' + k);
+          var pct = document.getElementById('pct-' + k);
+          if (sl) sl.value = 0;
+          if (pct) pct.textContent = '0%';
+        });
+        if (box) box.style.display = '';
+        drawCropPreview();
+      }).catch(function (err) { toast(friendly(err), 'err'); });
     });
 
     form.addEventListener('submit', function (e) {
@@ -926,14 +1024,18 @@ input[type=file]{padding:8px;background:#fafafa}
         var base = newImageBase(ownerId);
         var fullName = base + '.jpg';
         var thumbName = base + '-thumb.jpg';
-        chain = compressImage(file, 1600, 0.75).then(function (blob) {
+        chain = loadImage(file).then(function (img) {
           btn.textContent = '正在上传图片…';
-          return uploadFile(blob, fullName);
-        }).then(function () {
-          btn.textContent = '正在生成缩略图…';
-          return compressImage(file, 400, 0.65);
-        }).then(function (tb) {
-          return uploadFile(tb, thumbName).catch(function () { return thumbName; });
+          var fullCanvas = cropToCanvas(img, cropState, 1600);
+          var thumbCanvas = cropToCanvas(img, cropState, 400);
+          return canvasToBlob(fullCanvas, 0.75).then(function (blob) {
+            return uploadFile(blob, fullName);
+          }).then(function () {
+            btn.textContent = '正在生成缩略图…';
+            return canvasToBlob(thumbCanvas, 0.65);
+          }).then(function (tb) {
+            return uploadFile(tb, thumbName).catch(function () { return thumbName; });
+          });
         }).then(function () {
           data.image_path = fullName;
         });
