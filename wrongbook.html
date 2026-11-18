@@ -247,7 +247,8 @@ input[type=file]{padding:8px;background:#fafafa}
     view: 'login',
     teacherStudentId: null,
     filterStatus: 'all',
-    loginRole: 'student'
+    loginRole: 'student',
+    subject: '物理',
   };
 
   // ====== 基础工具 ======
@@ -256,6 +257,10 @@ input[type=file]{padding:8px;background:#fafafa}
     return String(v).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
+  }
+
+  function isOwner() {
+    return !!(S.profile && S.profile.subject === '负责人');
   }
 
   function todayStr() {
@@ -273,6 +278,10 @@ input[type=file]{padding:8px;background:#fafafa}
   function friendly(err) {
     var m = (err && err.message) ? err.message : String(err);
     if (m.indexOf('NO_STUDENTS') >= 0) return '至少选一个学生';
+    if (m.indexOf('FORBIDDEN') >= 0) return '你没有权限做这个操作';
+    if (m.indexOf('BAD_SUBJECT') >= 0) return '科目只能是数学或物理';
+    if (m.indexOf('BAD_TEACHER') >= 0) return '选中的不是普通老师';
+    if (m.indexOf('CANNOT_SELF') >= 0) return '不能停用自己';
     if (m.indexOf('TOO_MANY_ATTEMPTS') >= 0) return '错太多次了，等 10 分钟再试';
     if (m.indexOf('OLD_PIN_WRONG') >= 0) return '原口令不对';
     if (m.indexOf('PIN_TOO_SHORT') >= 0) return '新口令至少 4 位';
@@ -421,7 +430,7 @@ input[type=file]{padding:8px;background:#fafafa}
 
   // ====== 数据加载 ======
   function loadStudentData() {
-    return rpc('my_questions', { p_token: S.token }).then(function (d) {
+    return rpc('my_questions', { p_token: S.token, p_subject: S.subject }).then(function (d) {
       S.questions = d || [];
     });
   }
@@ -467,7 +476,8 @@ input[type=file]{padding:8px;background:#fafafa}
             '<label>口令</label><input name="pin" type="password" inputmode="numeric" placeholder="老师给你的 4 位数字">' +
           '</div>' +
           '<div id="teacherFields" style="' + (S.loginRole === 'teacher' ? '' : 'display:none') + '">' +
-            '<label>教师口令</label><input name="password" type="password" placeholder="教师口令">' +
+            '<label>工号</label><input name="tcode" placeholder="例如 T001" autocapitalize="characters">' +
+            '<label>口令</label><input name="tpin" type="password" placeholder="老师给你的初始口令">' +
           '</div>' +
           '<button class="btn primary block" type="submit">登录</button>' +
           '<p class="hint" id="loginHint"></p>' +
@@ -518,14 +528,18 @@ input[type=file]{padding:8px;background:#fafafa}
         if (mustChange) openChangePin(true);
       }).catch(fail);
     } else {
-      var pw = form.password.value || '';
-      if (!pw) { fail(new Error('口令不能为空')); return; }
-      rpc('teacher_login', { p_password: pw }).then(function (d) {
+      var tcode = (form.tcode.value || '').trim();
+      var tpin = (form.tpin.value || '').trim();
+      if (!tcode || !tpin) { fail(new Error('工号和口令都要填')); return; }
+      var tMust = false;
+      rpc('teacher_login', { p_code: tcode, p_pin: tpin }).then(function (d) {
         saveAuth(d.token, 'teacher', d);
+        tMust = !!d.must_change_pin;
         S.view = 'teacher';
         return loadTeacherData();
       }).then(function () {
         render();
+        if (tMust) openChangeTeacherPin(true);
       }).catch(fail);
     }
   }
@@ -583,6 +597,10 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<div class="topbar"><div><strong>' + esc(name) + '</strong> <span class="muted small">' + esc(code) + '</span></div>';
     html += '<div class="right"><button class="btn tiny" data-action="change-pin">改口令</button><button class="btn tiny" data-action="logout">退出</button></div></div>';
     html += '<div class="wrap">';
+    html += '<div class="filters" style="margin-bottom:12px">' +
+      ['物理', '数学'].map(function (sb) {
+        return '<button class="chip ' + (S.subject === sb ? 'active' : '') + '" style="padding:8px 18px;font-size:15px" data-action="switch-subject" data-subject="' + sb + '">' + sb + '</button>';
+      }).join('') + '</div>';
     html += '<div class="stats">';
     html += '<div class="stat"><b>' + qs.length + '</b><span>错题总数</span></div>';
     html += '<div class="stat"><b class="warn">' + due.length + '</b><span>今天该复习</span></div>';
@@ -612,10 +630,16 @@ input[type=file]{padding:8px;background:#fafafa}
     var total = (S.questions || []).length;
 
     var html = '';
-    html += '<div class="topbar"><div><strong>教师端</strong></div>';
+    var me = S.profile || {};
+    var subjLabel = me.subject === '负责人' ? '负责人' : (me.subject || '');
+    html += '<div class="topbar"><div><strong>' + esc(me.name || me.code || '教师端') + '</strong> <span class="chip">' + esc(subjLabel) + '</span></div>';
     html += '<div class="right">';
     html += '<button class="btn tiny primary" data-action="bulk-add">批量加题</button>';
-    html += '<button class="btn tiny" data-action="new-student">新建学生</button>';
+    if (isOwner()) {
+      html += '<button class="btn tiny" data-action="new-student">新建学生</button>';
+      html += '<button class="btn tiny" data-action="teacher-admin">老师</button>';
+    }
+    html += '<button class="btn tiny" data-action="change-tpin">改口令</button>';
     html += '<button class="btn tiny" data-action="logout">退出</button>';
     html += '</div></div>';
     html += '<div class="wrap">';
@@ -626,7 +650,7 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<h2 class="sec">学生名单</h2>';
 
     if (!sts.length) {
-      html += '<div class="empty">还没有学生，点右上角「新建学生」。</div>';
+      html += '<div class="empty">' + (isOwner() ? '还没有学生，点右上角「新建学生」。' : '你名下还没有学生，请联系负责人分配。') + '</div>';
     } else {
       html += sts.map(function (st) {
         return '<div class="scard' + (st.is_active === false ? ' inactive' : '') + '">' +
@@ -637,9 +661,7 @@ input[type=file]{padding:8px;background:#fafafa}
           '<div class="scard-actions">' +
             '<button class="btn tiny" data-action="open-student" data-id="' + st.id + '">看错题</button>' +
             '<button class="btn tiny primary" data-action="add-q" data-student-id="' + st.id + '">加题</button>' +
-            '<button class="btn tiny" data-action="rename-student" data-id="' + st.id + '" data-code="' + esc(st.code) + '" data-name="' + esc(st.name || '') + '">改名</button>' +
-            '<button class="btn tiny" data-action="reset-pin" data-id="' + st.id + '" data-code="' + esc(st.code) + '">改口令</button>' +
-            '<button class="btn tiny" data-action="toggle-active" data-id="' + st.id + '" data-active="' + (st.is_active === false ? '1' : '0') + '">' + (st.is_active === false ? '启用' : '停用') + '</button>' +
+            (isOwner() ? '<button class="btn tiny" data-action="manage-student" data-id="' + st.id + '" data-code="' + esc(st.code) + '" data-name="' + esc(st.name || '') + '" data-active="' + (st.is_active === false ? '1' : '0') + '">管理</button>' : '') +
           '</div></div>';
       }).join('');
     }
@@ -663,7 +685,9 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<button class="btn tiny" data-action="back-teacher">← 返回</button>';
     html += '<strong>' + esc(title) + '</strong>';
     html += '<button class="btn tiny primary" data-action="add-q" data-student-id="' + S.teacherStudentId + '">加题</button>';
-    html += '<button class="btn tiny danger" data-action="del-student" data-id="' + S.teacherStudentId + '" data-code="' + esc(st ? st.code : '') + '" data-name="' + esc(st && st.name ? st.name : '') + '">删除学生</button>';
+    if (isOwner()) {
+      html += '<button class="btn tiny danger" data-action="del-student" data-id="' + S.teacherStudentId + '" data-code="' + esc(st ? st.code : '') + '" data-name="' + esc(st && st.name ? st.name : '') + '">删除学生</button>';
+    }
     html += '</div>';
     html += '<div class="wrap">';
     html += '<div class="stats">';
@@ -772,6 +796,13 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<div class="modal-head"><h3>记一道错题</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
     html += '<form id="addForm" autocomplete="off">';
     html += checks;
+    var subjVal = isStudent ? S.subject : (isOwner() ? '物理' : ((S.profile && S.profile.subject) || '物理'));
+    var subjLock = (isStudent || !isOwner());
+    html += '<label>科目</label><select name="subject"' + (subjLock ? ' disabled' : '') + '>' +
+      ['物理', '数学'].map(function (sv) {
+        return '<option value="' + sv + '"' + (sv === subjVal ? ' selected' : '') + '>' + sv + '</option>';
+      }).join('') +
+      '</select>';
     html += '<label>题目照片（可选）</label><input type="file" name="photo" accept="image/*">';
     html += '<div id="photoPreview"></div>';
     html += '<label>题干</label><textarea name="stem" rows="3" placeholder="文字题干，只拍照不写也行"></textarea>';
@@ -814,6 +845,7 @@ input[type=file]{padding:8px;background:#fafafa}
       e.preventDefault();
       var btn = document.getElementById('addSubmit');
       var data = {
+        subject: (form.subject && form.subject.value) || '物理',
         stem: form.stem.value.trim(),
         my_answer: form.my_answer.value.trim(),
         correct_answer: form.correct_answer.value.trim(),
@@ -920,6 +952,155 @@ input[type=file]{padding:8px;background:#fafafa}
       .catch(function (err) { toast(friendly(err), 'err'); });
   }
 
+  // ====== 老师改自己的口令 ======
+  function openChangeTeacherPin(force) {
+    var html = '';
+    html += '<div class="modal-head"><h3>' + (force ? '第一次登录，请设置自己的口令' : '改我的口令') + '</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="ctpForm" autocomplete="off">';
+    html += '<label>原口令</label><input name="oldpin" type="password">';
+    html += '<label>新口令（至少 4 位）</label><input name="newpin" type="password">';
+    html += '<label>再输一次</label><input name="newpin2" type="password">';
+    html += '<button class="btn primary block" type="submit">保存</button>';
+    html += '</form>';
+    showModal(html);
+
+    var form = document.getElementById('ctpForm');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var a = form.oldpin.value.trim(), b = form.newpin.value.trim(), c = form.newpin2.value.trim();
+      if (!a || !b) { toast('都要填', 'err'); return; }
+      if (b !== c) { toast('两次输入的新口令不一样', 'err'); return; }
+      if (b.length < 4) { toast('新口令至少 4 位', 'err'); return; }
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('change_teacher_pin', { p_token: S.token, p_old_pin: a, p_new_pin: b })
+        .then(function () {
+          if (S.profile) {
+            S.profile.must_change_pin = false;
+            localStorage.setItem('wb_profile', JSON.stringify(S.profile));
+          }
+          closeModal();
+          toast('口令已改');
+        })
+        .catch(function (err) { toast(friendly(err), 'err'); btn.disabled = false; });
+    });
+  }
+
+  // ====== 负责人：学生管理面板 ======
+  function openManageStudent(id) {
+    var st = null;
+    for (var i = 0; i < (S.students || []).length; i++) {
+      if (Number(S.students[i].id) === Number(id)) { st = S.students[i]; break; }
+    }
+    if (!st) return;
+
+    var html = '';
+    html += '<div class="modal-head"><h3>管理 ' + esc(st.code) + '</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+
+    html += '<label>姓名</label>';
+    html += '<div style="display:flex;gap:8px"><input id="mgName" value="' + esc(st.name || '') + '" placeholder="真实姓名" style="flex:1">';
+    html += '<button class="btn" data-action="save-name" data-id="' + st.id + '">保存</button></div>';
+
+    html += '<label>状态</label>';
+    html += '<div><button class="btn ' + (st.is_active === false ? '' : 'danger') + '" data-action="toggle-active" data-id="' + st.id + '" data-active="' + (st.is_active === false ? '1' : '0') + '">' + (st.is_active === false ? '启用这个学生' : '停用这个学生') + '</button></div>';
+
+    html += '<label>口令</label>';
+    html += '<div><button class="btn" data-action="reset-pin" data-id="' + st.id + '" data-code="' + esc(st.code) + '">重置口令</button></div>';
+
+    html += '<label>分配给哪些老师（勾选即生效）</label>';
+    html += '<div class="checks" id="assignBox">加载中…</div>';
+
+    showModal(html);
+
+    rpc('list_teachers', { p_token: S.token }).then(function (list) {
+      var box = document.getElementById('assignBox');
+      if (!box) return;
+      var mine = (st.teacher_ids || []).map(Number);
+      var h = '';
+      (list || []).forEach(function (t2) {
+        if (t2.subject === '负责人') return;
+        var on = mine.indexOf(Number(t2.id)) >= 0;
+        h += '<label class="check"><input type="checkbox" data-action="assign" data-sid="' + st.id + '" data-tid="' + t2.id + '"' + (on ? ' checked' : '') + '>' +
+          esc(t2.code) + ' ' + esc(t2.name || '') + '（' + esc(t2.subject) + '）</label>';
+      });
+      box.innerHTML = h || '<span class="muted small">还没有老师，先去右上角「老师」里建。</span>';
+    }).catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  // ====== 负责人：老师管理 ======
+  function openTeacherAdmin() {
+    rpc('list_teachers', { p_token: S.token }).then(function (list) {
+      var html = '';
+      html += '<div class="modal-head"><h3>老师管理</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+      html += '<button class="btn primary block" data-action="new-teacher" style="margin-bottom:14px">＋ 新建老师</button>';
+      (list || []).forEach(function (t2) {
+        html += '<div class="scard' + (t2.is_active === false ? ' inactive' : '') + '">' +
+          '<div class="scard-main"><strong>' + esc(t2.code) + '</strong>' +
+          (t2.name ? '<span class="muted">' + esc(t2.name) + '</span>' : '') +
+          '<span class="chip">' + esc(t2.subject) + '</span>' +
+          (t2.is_active === false ? '<span class="chip bad">已停用</span>' : '') + '</div>' +
+          '<div class="muted small">名下学生 ' + (t2.student_count || 0) + ' 人</div>' +
+          (t2.subject === '负责人' ? '' :
+            '<div class="scard-actions">' +
+              '<button class="btn tiny" data-action="reset-tpin" data-id="' + t2.id + '" data-code="' + esc(t2.code) + '">重置口令</button>' +
+              '<button class="btn tiny" data-action="toggle-teacher" data-id="' + t2.id + '" data-active="' + (t2.is_active === false ? '1' : '0') + '">' + (t2.is_active === false ? '启用' : '停用') + '</button>' +
+            '</div>') +
+          '</div>';
+      });
+      showModal(html);
+    }).catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function openNewTeacher() {
+    var html = '';
+    html += '<div class="modal-head"><h3>新建老师</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="ntForm" autocomplete="off">';
+    html += '<label>工号</label><input name="code" placeholder="例如 T001">';
+    html += '<label>姓名</label><input name="name">';
+    html += '<label>科目</label><select name="subject"><option value="物理">物理</option><option value="数学">数学</option></select>';
+    html += '<label>初始口令</label><input name="pin" placeholder="例如 2024">';
+    html += '<button class="btn primary block" type="submit">创建</button>';
+    html += '</form>';
+    showModal(html);
+    var f = document.getElementById('ntForm');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = f.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('create_teacher', {
+        p_token: S.token,
+        p_code: f.code.value.trim(),
+        p_name: f.name.value.trim(),
+        p_subject: f.subject.value,
+        p_pin: f.pin.value.trim()
+      }).then(function () {
+        toast('老师已创建');
+        return openTeacherAdmin();
+      }).catch(function (err) { toast(friendly(err), 'err'); btn.disabled = false; });
+    });
+  }
+
+  function openResetTeacherPin(id, code) {
+    var html = '';
+    html += '<div class="modal-head"><h3>重置 ' + esc(code) + ' 的口令</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="rtpForm" autocomplete="off">';
+    html += '<label>新口令</label><input name="pin" placeholder="至少 4 位">';
+    html += '<button class="btn primary block" type="submit">保存</button>';
+    html += '</form>';
+    showModal(html);
+    var f = document.getElementById('rtpForm');
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pin = f.pin.value.trim();
+      if (!pin) { toast('口令不能为空', 'err'); return; }
+      var btn = f.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('reset_teacher_pin', { p_token: S.token, p_teacher_id: Number(id), p_new_pin: pin })
+        .then(function () { toast('口令已重置，该老师需重新登录'); return openTeacherAdmin(); })
+        .catch(function (err) { toast(friendly(err), 'err'); btn.disabled = false; });
+    });
+  }
+
   // ====== 学生改自己的口令 ======
   function openChangePin(force) {
     var html = '';
@@ -1002,9 +1183,34 @@ input[type=file]{padding:8px;background:#fafafa}
   // ====== 重置学生口令 ======
   function doToggleActive(id, makeActive) {
     rpc('teacher_set_student_active', { p_token: S.token, p_student_id: Number(id), p_active: makeActive })
-      .then(function () { return refreshCurrent(); })
+      .then(function () {
+        closeModal();
+        return refreshCurrent();
+      })
       .then(function () { toast(makeActive ? '已启用，该学生可以登录了' : '已停用，该学生无法登录'); })
       .catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function doToggleTeacher(id, makeActive) {
+    rpc('teacher_set_teacher_active', { p_token: S.token, p_teacher_id: Number(id), p_active: makeActive })
+      .then(function () { toast(makeActive ? '已启用' : '已停用'); return openTeacherAdmin(); })
+      .catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function doSaveStudentName(id) {
+    var inp = document.getElementById('mgName');
+    var nm = inp ? inp.value.trim() : '';
+    if (!nm) { toast('名字不能为空', 'err'); return; }
+    rpc('teacher_update_student', { p_token: S.token, p_student_id: Number(id), p_name: nm })
+      .then(function () { return loadTeacherData(); })
+      .then(function () { render(); closeModal(); toast('名字已改'); })
+      .catch(function (err) { toast(friendly(err), 'err'); });
+  }
+
+  function switchSubject(subject) {
+    if (S.subject === subject) return;
+    S.subject = subject;
+    loadStudentData().then(render).catch(function (err) { toast(friendly(err), 'err'); });
   }
 
   function openDeleteStudent(id, code, name) {
@@ -1177,9 +1383,35 @@ input[type=file]{padding:8px;background:#fafafa}
       if (a === 'open-student') { openStudentView(Number(el.getAttribute('data-id'))); return; }
       if (a === 'back-teacher') { backToTeacher(); return; }
       if (a === 'filter') { setFilter(el.getAttribute('data-status')); return; }
+      if (a === 'switch-subject') { switchSubject(el.getAttribute('data-subject')); return; }
+      if (a === 'manage-student') { openManageStudent(el.getAttribute('data-id')); return; }
+      if (a === 'teacher-admin') { openTeacherAdmin(); return; }
+      if (a === 'new-teacher') { openNewTeacher(); return; }
+      if (a === 'change-tpin') { openChangeTeacherPin(); return; }
+      if (a === 'reset-tpin') { openResetTeacherPin(el.getAttribute('data-id'), el.getAttribute('data-code')); return; }
+      if (a === 'toggle-teacher') { doToggleTeacher(el.getAttribute('data-id'), el.getAttribute('data-active') === '1'); return; }
+      if (a === 'save-name') { doSaveStudentName(el.getAttribute('data-id')); return; }
     } catch (err) {
       toast(friendly(err), 'err');
     }
+  });
+
+  document.addEventListener('change', function (e) {
+    var el = e.target;
+    if (!el || !el.getAttribute || el.getAttribute('data-action') !== 'assign') return;
+    rpc('assign_student', {
+      p_token: S.token,
+      p_student_id: Number(el.getAttribute('data-sid')),
+      p_teacher_id: Number(el.getAttribute('data-tid')),
+      p_on: el.checked
+    }).then(function () {
+      return loadTeacherData();
+    }).then(function () {
+      toast(el.checked ? '已分配' : '已取消分配');
+    }).catch(function (err) {
+      toast(friendly(err), 'err');
+      el.checked = !el.checked;
+    });
   });
 
   // ====== 启动 ======
@@ -1197,6 +1429,7 @@ input[type=file]{padding:8px;background:#fafafa}
       app.innerHTML = '<div class="loading">加载中…</div>';
       refreshCurrent().then(function () {
         if (S.role === 'student' && S.profile && S.profile.must_change_pin) openChangePin(true);
+        if (S.role === 'teacher' && S.profile && S.profile.must_change_pin) openChangeTeacherPin(true);
       }).catch(function (err) {
         if (String(err.message || err).indexOf('SESSION_INVALID') >= 0) {
           clearAuth();
