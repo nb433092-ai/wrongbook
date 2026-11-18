@@ -217,9 +217,37 @@ input[type=file]{padding:8px;background:#fafafa}
     ]}
   ];
 
-  function chapterOptionsHtml() {
-    var html = '<option value="">（不指定章节）</option>';
-    CATALOG.forEach(function (b) {
+  // 数学按知识板块分类（不依赖教材版本）
+  var CATALOG_MATH = [
+    { book: '初中数学', chapters: [
+      { name: '数与式', sections: ['有理数与实数', '整式与因式分解', '分式', '二次根式', '科学记数法与近似计算'] },
+      { name: '方程与不等式', sections: ['一元一次方程', '二元一次方程组', '一元二次方程', '分式方程', '不等式与不等式组'] },
+      { name: '函数', sections: ['平面直角坐标系', '一次函数', '反比例函数', '二次函数', '函数图象与实际问题'] },
+      { name: '图形与几何', sections: ['相交线与平行线', '三角形与全等', '四边形', '圆', '相似与位似', '锐角三角函数', '勾股定理', '轴对称与旋转', '投影与视图'] },
+      { name: '统计与概率', sections: ['数据的收集与整理', '平均数中位数众数方差', '概率初步'] },
+      { name: '综合与实践', sections: ['应用题建模', '方案设计与最值问题', '动态几何'] }
+    ]},
+    { book: '高中数学', chapters: [
+      { name: '集合与逻辑', sections: ['集合', '充分必要条件', '量词与命题'] },
+      { name: '函数与导数', sections: ['函数概念与性质', '指数对数函数', '三角函数', '导数及其应用', '函数零点与建模'] },
+      { name: '数列', sections: ['等差与等比数列', '数列求和', '递推与通项'] },
+      { name: '不等式', sections: ['一元二次不等式', '基本不等式', '线性规划'] },
+      { name: '立体几何', sections: ['空间几何体', '点线面位置关系', '空间向量与立体几何'] },
+      { name: '解析几何', sections: ['直线与圆', '椭圆', '双曲线', '抛物线', '直线与圆锥曲线综合'] },
+      { name: '平面向量', sections: ['向量的运算', '向量与几何', '向量与三角'] },
+      { name: '复数', sections: ['复数的概念与运算', '复数的几何意义'] },
+      { name: '概率统计', sections: ['排列组合与二项式', '随机变量及其分布', '统计与回归', '概率计算'] },
+      { name: '综合与应用', sections: ['数学建模', '综合压轴'] }
+    ]}
+  ];
+
+  function catalogFor(subject) {
+    return subject === '数学' ? CATALOG_MATH : CATALOG;
+  }
+
+  function chapterOptionsHtml(subject) {
+    var html = '<option value="">（不指定）</option>';
+    catalogFor(subject).forEach(function (b) {
       html += '<optgroup label="' + b.book + '">';
       b.chapters.forEach(function (c) {
         html += '<option value="' + c.name + '">' + c.name + '</option>';
@@ -229,9 +257,10 @@ input[type=file]{padding:8px;background:#fafafa}
     return html;
   }
 
-  function sectionsOf(chapterName) {
-    for (var i = 0; i < CATALOG.length; i++) {
-      var cs = CATALOG[i].chapters;
+  function sectionsOf(subject, chapterName) {
+    var cat = catalogFor(subject);
+    for (var i = 0; i < cat.length; i++) {
+      var cs = cat[i].chapters;
       for (var j = 0; j < cs.length; j++) {
         if (cs[j].name === chapterName) return cs[j].sections;
       }
@@ -811,8 +840,8 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<label>解析</label><textarea name="analysis" rows="3" placeholder="为什么错、正确思路是什么"></textarea>';
     html += '<label>错因</label><select name="error_type"><option value="">未分类</option>' + errOptions + '</select>';
     html += '<label>难度</label><select name="level"><option value="">未标注</option>' + lvlOptions + '</select>';
-    html += '<div class="row2"><div><label>章节</label><select name="chapter" id="chapterSel">' + chapterOptionsHtml() + '</select></div>';
-    html += '<div><label>小节</label><select name="section" id="sectionSel"></select></div></div>';
+    html += '<div class="row2"><div><label id="chLabel">章节</label><select name="chapter" id="chapterSel">' + chapterOptionsHtml(subjVal) + '</select></div>';
+    html += '<div><label id="secLabel">小节</label><select name="section" id="sectionSel"></select></div></div>';
     html += '<label>出处</label><input name="source" placeholder="如 2024 全国甲卷第 18 题">';
     html += '<button class="btn primary block" type="submit" id="addSubmit">保存</button>';
     html += '</form>';
@@ -823,16 +852,38 @@ input[type=file]{padding:8px;background:#fafafa}
 
     var chapterSel = document.getElementById('chapterSel');
     var sectionSel = document.getElementById('sectionSel');
+    var chLabel = document.getElementById('chLabel');
+    var secLabel = document.getElementById('secLabel');
+
+    function curSubject() {
+      return (form.subject && form.subject.value) || '物理';
+    }
+
     function fillSections() {
-      var list = sectionsOf(chapterSel.value);
+      var list = sectionsOf(curSubject(), chapterSel.value);
       var h = '<option value="">（不指定）</option>';
       for (var i = 0; i < list.length; i++) {
         h += '<option value="' + list[i] + '">' + list[i] + '</option>';
       }
       sectionSel.innerHTML = h;
     }
+
+    function refreshLabels() {
+      var isMath = curSubject() === '数学';
+      if (chLabel) chLabel.textContent = isMath ? '板块' : '章节';
+      if (secLabel) secLabel.textContent = isMath ? '知识点' : '小节';
+    }
+
+    function rebuildChapters() {
+      chapterSel.innerHTML = chapterOptionsHtml(curSubject());
+      fillSections();
+      refreshLabels();
+    }
+
     chapterSel.addEventListener('change', fillSections);
+    if (form.subject) form.subject.addEventListener('change', rebuildChapters);
     fillSections();
+    refreshLabels();
 
     form.photo.addEventListener('change', function (e) {
       var file = e.target.files && e.target.files[0];
