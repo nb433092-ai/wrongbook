@@ -145,6 +145,98 @@ input[type=file]{padding:8px;background:#fafafa}
   var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVua3ZpaXZsZ2l0cmVnaHBtYXZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5MDEyNDEsImV4cCI6MjExMDQ3NzI0MX0.Lt_YIJZb2iDB5UdI7aHrKpeotnuVqLhrIzGhmt6Io3o';
   var BUCKET = 'wrongbook-images';
 
+  // 人教版物理目录：初中（2024 版，3 册 22 章）+ 高中（2019 版，6 册 26 章），跨学科实践章节未列入
+  var CATALOG = [
+    { book: '初中 八年级上册', chapters: [
+      { name: '第一章 机械运动', sections: ['长度和时间的测量', '运动的描述', '运动的快慢', '速度的测量'] },
+      { name: '第二章 声现象', sections: ['声音的产生与传播', '声音的特性', '声的利用', '噪声的危害和控制'] },
+      { name: '第三章 物态变化', sections: ['温度', '熔化和凝固', '汽化和液化', '升华和凝华'] },
+      { name: '第四章 光现象', sections: ['光的直线传播', '光的反射', '平面镜成像', '光的折射', '光的色散'] },
+      { name: '第五章 透镜及其应用', sections: ['透镜', '生活中的透镜', '凸透镜成像的规律', '眼睛和眼镜'] },
+      { name: '第六章 质量与密度', sections: ['质量', '密度', '测量液体和固体的密度', '密度的应用'] }
+    ]},
+    { book: '初中 八年级下册', chapters: [
+      { name: '第七章 力', sections: ['力', '弹力', '重力'] },
+      { name: '第八章 运动和力', sections: ['牛顿第一定律', '二力平衡', '摩擦力', '同一直线上二力的合成'] },
+      { name: '第九章 压强', sections: ['压强', '液体的压强', '大气压强', '流体压强与流速的关系'] },
+      { name: '第十章 浮力', sections: ['浮力', '阿基米德原理', '物体的浮沉条件及应用'] },
+      { name: '第十一章 功和机械能', sections: ['功', '功率', '动能和势能', '机械能及其转化'] },
+      { name: '第十二章 简单机械', sections: ['杠杆', '滑轮', '机械效率'] }
+    ]},
+    { book: '初中 九年级全一册', chapters: [
+      { name: '第十三章 内能', sections: ['热量 比热容', '分子动理论的初步知识', '内能'] },
+      { name: '第十四章 内能的利用', sections: ['能量的转化与守恒', '热机', '热机的效率'] },
+      { name: '第十五章 电流和电路', sections: ['两种电荷', '电流和电路', '串联电路和并联电路', '电流的测量', '串、并联电路中电流的规律'] },
+      { name: '第十六章 电压 电阻', sections: ['电压', '串、并联电路中电压的规律', '电阻', '变阻器'] },
+      { name: '第十七章 欧姆定律', sections: ['电流与电压、电阻的关系', '欧姆定律', '电阻的测量', '欧姆定律在串、并联电路中的应用'] },
+      { name: '第十八章 电功率', sections: ['电能 电功', '电功率', '焦耳定律'] },
+      { name: '第十九章 生活用电', sections: ['安全用电', '家庭电路的基本组成'] },
+      { name: '第二十章 电与磁', sections: ['磁现象 磁场', '电生磁', '电磁铁 电磁继电器', '电动机', '磁生电'] },
+      { name: '第二十一章 电磁波及其应用', sections: ['电磁波的海洋', '广播、电视和移动通信', '卫星通信和光纤通信'] },
+      { name: '第二十二章 能源与可持续发展', sections: ['能源利用的现状和面临的挑战', '新能源的发展'] }
+    ]},
+    { book: '高中 必修第一册', chapters: [
+      { name: '第一章 运动的描述', sections: ['质点 参考系', '时间 位移', '位置变化快慢的描述——速度', '速度变化快慢的描述——加速度'] },
+      { name: '第二章 匀变速直线运动的研究', sections: ['实验：探究小车速度随时间变化的规律', '匀变速直线运动的速度与时间的关系', '匀变速直线运动的位移与时间的关系', '自由落体运动'] },
+      { name: '第三章 相互作用——力', sections: ['重力与弹力', '摩擦力', '力的合成和分解', '共点力的平衡'] },
+      { name: '第四章 运动和力的关系', sections: ['牛顿第一定律', '实验：探究加速度与力、质量的关系', '牛顿第二定律', '力学单位制', '牛顿运动定律的应用', '超重和失重'] }
+    ]},
+    { book: '高中 必修第二册', chapters: [
+      { name: '第五章 抛体运动', sections: ['曲线运动', '运动的合成与分解', '实验：探究平抛运动的特点', '抛体运动的规律'] },
+      { name: '第六章 圆周运动', sections: ['圆周运动', '向心力', '向心加速度', '生活中的圆周运动'] },
+      { name: '第七章 万有引力与宇宙航行', sections: ['行星的运动', '万有引力定律', '万有引力理论的成就', '宇宙航行', '相对论时空观与牛顿力学的局限性'] },
+      { name: '第八章 机械能守恒定律', sections: ['功与功率', '重力势能', '动能和动能定理', '机械能守恒定律', '实验：验证机械能守恒定律'] }
+    ]},
+    { book: '高中 必修第三册', chapters: [
+      { name: '第九章 静电场及其应用', sections: ['电荷', '库仑定律', '电场 电场强度', '静电的防止与利用'] },
+      { name: '第十章 静电场中的能量', sections: ['电势能和电势', '电势差', '电势差与电场强度的关系', '电容器的电容', '带电粒子在电场中的运动'] },
+      { name: '第十一章 电路及其应用', sections: ['电源和电流', '导体的电阻', '导体电阻率的测量', '串联电路和并联电路', '实验：练习使用多用电表'] },
+      { name: '第十二章 电能 能量守恒定律', sections: ['电路中的能量转化', '闭合电路的欧姆定律', '电池电动势和内阻的测量', '能源与可持续发展'] }
+    ]},
+    { book: '高中 选择性必修第一册', chapters: [
+      { name: '第一章 动量守恒定律', sections: ['动量', '动量定理', '动量守恒定律', '实验：验证动量守恒定律', '弹性碰撞和非弹性碰撞', '反冲现象 火箭'] },
+      { name: '第二章 机械振动', sections: ['简谐运动', '简谐运动的描述', '简谐运动的回复力和能量', '单摆', '实验：用单摆测量重力加速度', '受迫振动 共振'] },
+      { name: '第三章 机械波', sections: ['波的形成', '波的描述', '波的反射、折射和衍射', '波的干涉', '多普勒效应'] },
+      { name: '第四章 光', sections: ['光的折射', '全反射', '光的干涉', '光的衍射', '光的偏振 激光'] }
+    ]},
+    { book: '高中 选择性必修第二册', chapters: [
+      { name: '第一章 安培力与洛伦兹力', sections: ['磁场对通电导线的作用力', '磁场对运动电荷的作用力', '带电粒子在匀强磁场中的运动', '质谱仪与回旋加速器'] },
+      { name: '第二章 电磁感应', sections: ['楞次定律', '法拉第电磁感应定律', '涡流、电磁阻尼和电磁驱动', '互感和自感'] },
+      { name: '第三章 交变电流', sections: ['交变电流', '交变电流的描述', '变压器', '电能的输送'] },
+      { name: '第四章 电磁振荡与电磁波', sections: ['电磁振荡', '电磁场与电磁波', '无线电波的发射和接收', '电磁波谱'] },
+      { name: '第五章 传感器', sections: ['认识传感器', '常见传感器的工作原理及应用', '利用传感器制作简单的自动控制装置'] }
+    ]},
+    { book: '高中 选择性必修第三册', chapters: [
+      { name: '第一章 分子动理论', sections: ['分子动理论的基本内容', '实验：用油膜法估测油酸分子的大小', '分子运动速率分布规律', '分子动能和分子势能'] },
+      { name: '第二章 气体、固体和液体', sections: ['温度和温标', '气体的等温变化', '气体的等压变化和等容变化', '固体和液体'] },
+      { name: '第三章 热力学定律', sections: ['功、热和内能的改变', '热力学第一定律', '能量守恒定律', '热力学第二定律'] },
+      { name: '第四章 原子结构和波粒二象性', sections: ['普朗克黑体辐射理论', '光电效应', '原子的核式结构模型', '氢原子光谱和玻尔的原子模型', '粒子的波动性和量子力学的建立'] },
+      { name: '第五章 原子核', sections: ['原子核的组成', '放射性元素的衰变', '核力与结合能', '核裂变与核聚变', '“基本”粒子'] }
+    ]}
+  ];
+
+  function chapterOptionsHtml() {
+    var html = '<option value="">（不指定章节）</option>';
+    CATALOG.forEach(function (b) {
+      html += '<optgroup label="' + b.book + '">';
+      b.chapters.forEach(function (c) {
+        html += '<option value="' + c.name + '">' + c.name + '</option>';
+      });
+      html += '</optgroup>';
+    });
+    return html;
+  }
+
+  function sectionsOf(chapterName) {
+    for (var i = 0; i < CATALOG.length; i++) {
+      var cs = CATALOG[i].chapters;
+      for (var j = 0; j < cs.length; j++) {
+        if (cs[j].name === chapterName) return cs[j].sections;
+      }
+    }
+    return [];
+  }
+
   var app = document.getElementById('app');
 
   var S = {
@@ -445,6 +537,7 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<div class="qtext">' + esc(q.stem || '（只有图片，没有文字题干）') + '</div>';
     html += '<div class="chips">';
     html += '<span class="chip ' + statusClass(q.status) + '">' + esc(q.status) + '</span>';
+    if (q.chapter) html += '<span class="chip">' + esc(q.chapter) + '</span>';
     if (q.error_type) html += '<span class="chip">' + esc(q.error_type) + '</span>';
     if (q.level) html += '<span class="chip">' + esc(q.level) + '</span>';
     if (q.added_by === 'teacher') html += '<span class="chip">老师加</span>';
@@ -671,8 +764,8 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<label>解析</label><textarea name="analysis" rows="3" placeholder="为什么错、正确思路是什么"></textarea>';
     html += '<label>错因</label><select name="error_type"><option value="">未分类</option>' + errOptions + '</select>';
     html += '<label>难度</label><select name="level"><option value="">未标注</option>' + lvlOptions + '</select>';
-    html += '<div class="row2"><div><label>章节</label><input name="chapter" placeholder="如 力学"></div>';
-    html += '<div><label>小节</label><input name="section" placeholder="如 牛顿第二定律"></div></div>';
+    html += '<div class="row2"><div><label>章节</label><select name="chapter" id="chapterSel">' + chapterOptionsHtml() + '</select></div>';
+    html += '<div><label>小节</label><select name="section" id="sectionSel"></select></div></div>';
     html += '<label>出处</label><input name="source" placeholder="如 2024 全国甲卷第 18 题">';
     html += '<button class="btn primary block" type="submit" id="addSubmit">保存</button>';
     html += '</form>';
@@ -680,6 +773,20 @@ input[type=file]{padding:8px;background:#fafafa}
     showModal(html);
 
     var form = document.getElementById('addForm');
+
+    var chapterSel = document.getElementById('chapterSel');
+    var sectionSel = document.getElementById('sectionSel');
+    function fillSections() {
+      var list = sectionsOf(chapterSel.value);
+      var h = '<option value="">（不指定）</option>';
+      for (var i = 0; i < list.length; i++) {
+        h += '<option value="' + list[i] + '">' + list[i] + '</option>';
+      }
+      sectionSel.innerHTML = h;
+    }
+    chapterSel.addEventListener('change', fillSections);
+    fillSections();
+
     form.photo.addEventListener('change', function (e) {
       var file = e.target.files && e.target.files[0];
       var box = document.getElementById('photoPreview');
