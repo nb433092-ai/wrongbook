@@ -78,7 +78,7 @@ input[type=file]{padding:8px;background:#fafafa}
 /* 错题卡片 */
 .qcard{display:flex;gap:12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer}
 .qcard.due{border-color:#f59e0b;box-shadow:0 0 0 1px #f59e0b inset}
-.thumb{width:62px;height:62px;flex:none;border-radius:9px;background:#f0f0f0 center/cover no-repeat}
+.thumb{width:62px;height:62px;flex:none;border-radius:9px;background:#f0f0f0 center/cover no-repeat;object-fit:cover;display:block}
 .qbody{min-width:0;flex:1}
 .qtext{font-size:15px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
@@ -354,8 +354,11 @@ input[type=file]{padding:8px;background:#fafafa}
     });
   }
 
-  function uploadImage(blob, ownerId) {
-    var name = ownerId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '.jpg';
+  function newImageBase(ownerId) {
+    return ownerId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function uploadFile(blob, name) {
     return fetch(SUPABASE_URL + '/storage/v1/object/' + BUCKET + '/' + name, {
       method: 'POST',
       headers: {
@@ -371,6 +374,11 @@ input[type=file]{padding:8px;background:#fafafa}
       }
       return name;
     });
+  }
+
+  function thumbPathOf(path) {
+    if (!path) return '';
+    return String(path).replace(/\.jpg$/i, '-thumb.jpg');
   }
 
   // ====== 登录态 ======
@@ -532,7 +540,9 @@ input[type=file]{padding:8px;background:#fafafa}
     var due = q.status !== '已掌握' && q.next_review_on && q.next_review_on <= todayStr();
     var html = '<div class="qcard' + ((highlight || due) ? ' due' : '') + '" data-action="open-q" data-id="' + q.id + '">';
     if (q.image_path) {
-      html += '<div class="thumb" style="background-image:url(&quot;' + esc(imgUrl(q.image_path)) + '&quot;)"></div>';
+      var _tu = esc(imgUrl(thumbPathOf(q.image_path)));
+      var _fu = esc(imgUrl(q.image_path));
+      html += '<img class="thumb" loading="lazy" decoding="async" alt="" src="' + _tu + '" onerror="this.onerror=null;this.src=\'' + _fu + '\'">';
     }
     html += '<div class="qbody">';
     html += '<div class="qtext">' + esc(q.stem || '（只有图片，没有文字题干）') + '</div>';
@@ -826,11 +836,19 @@ input[type=file]{padding:8px;background:#fafafa}
 
       var chain = Promise.resolve();
       if (file) {
-        chain = compressImage(file).then(function (blob) {
+        var base = newImageBase(ownerId);
+        var fullName = base + '.jpg';
+        var thumbName = base + '-thumb.jpg';
+        chain = compressImage(file, 1600, 0.75).then(function (blob) {
           btn.textContent = '正在上传图片…';
-          return uploadImage(blob, ownerId);
-        }).then(function (path) {
-          data.image_path = path;
+          return uploadFile(blob, fullName);
+        }).then(function () {
+          btn.textContent = '正在生成缩略图…';
+          return compressImage(file, 400, 0.65);
+        }).then(function (tb) {
+          return uploadFile(tb, thumbName).catch(function () { return thumbName; });
+        }).then(function () {
+          data.image_path = fullName;
         });
       }
 
@@ -885,7 +903,10 @@ input[type=file]{padding:8px;background:#fafafa}
     rpc('teacher_delete_question', { p_token: S.token, p_id: id })
       .then(function (d) {
         if (d && d.ok) {
-          if (d.image_path && Number(d.refs) === 0) deleteImage(d.image_path);
+          if (d.image_path && Number(d.refs) === 0) {
+            deleteImage(d.image_path);
+            deleteImage(thumbPathOf(d.image_path));
+          }
           closeModal();
           return refreshCurrent();
         }
