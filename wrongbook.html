@@ -824,6 +824,7 @@ input[type=file]{padding:8px;background:#fafafa}
       html += '<button class="btn primary" data-action="set-status" data-id="' + q.id + '" data-status="已掌握">标已掌握</button>';
       html += '</div>';
       html += '<div class="actions" style="margin-top:8px">';
+      html += '<button class="btn" data-action="edit-q" data-id="' + q.id + '">编辑题目</button>';
       html += '<button class="btn danger" data-action="del-q" data-id="' + q.id + '">删除这道题</button>';
       html += '</div>';
     }
@@ -1099,6 +1100,101 @@ input[type=file]{padding:8px;background:#fafafa}
         var b = document.getElementById('addSubmit');
         if (b) { b.disabled = false; b.textContent = '保存'; }
       });
+    });
+  }
+
+  function openEditQuestion(q) {
+    if (!q) return;
+    var subj = q.subject || '物理';
+    var errOptions = ['概念不清', '公式记错', '计算失误', '审题偏差', '思路缺失', '其他'].map(function (v) {
+      return '<option value="' + v + '"' + (q.error_type === v ? ' selected' : '') + '>' + v + '</option>';
+    }).join('');
+    var lvlOptions = ['基础', '提升', '拔尖'].map(function (v) {
+      return '<option value="' + v + '"' + (q.level === v ? ' selected' : '') + '>' + v + '</option>';
+    }).join('');
+    var subjOptions = ['物理', '数学'].map(function (v) {
+      return '<option value="' + v + '"' + (subj === v ? ' selected' : '') + '>' + v + '</option>';
+    }).join('');
+
+    var html = '';
+    html += '<div class="modal-head"><h3>编辑题目</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="editForm" autocomplete="off">';
+    html += '<label>题干</label><textarea name="stem" rows="3">' + esc(q.stem || '') + '</textarea>';
+    html += '<label>学生当时的错误答案</label><textarea name="my_answer" rows="2">' + esc(q.my_answer || '') + '</textarea>';
+    html += '<label>正确答案</label><textarea name="correct_answer" rows="2">' + esc(q.correct_answer || '') + '</textarea>';
+    html += '<label>解析</label><textarea name="analysis" rows="4">' + esc(q.analysis || '') + '</textarea>';
+    html += '<label>错因</label><select name="error_type"><option value="">未分类</option>' + errOptions + '</select>';
+    html += '<label>难度</label><select name="level"><option value="">未标注</option>' + lvlOptions + '</select>';
+    if (isOwner()) {
+      html += '<label>科目</label><select name="subject">' + subjOptions + '</select>';
+    }
+    html += '<div class="row2"><div><label id="echLabel">章节</label><select name="chapter" id="echSel"></select></div>';
+    html += '<div><label id="esecLabel">小节</label><select name="section" id="esecSel"></select></div></div>';
+    html += '<label>出处</label><input name="source" value="' + esc(q.source || '') + '">';
+    html += '<button class="btn primary block" type="submit" id="editSubmit">保存</button>';
+    html += '</form>';
+
+    showModal(html);
+
+    var form = document.getElementById('editForm');
+    var chSel = document.getElementById('echSel');
+    var secSel = document.getElementById('esecSel');
+    var chLabel = document.getElementById('echLabel');
+    var secLabel = document.getElementById('esecLabel');
+
+    function curSubj() {
+      return (form.subject && form.subject.value) || subj;
+    }
+
+    function fillSec() {
+      var list = sectionsOf(curSubj(), chSel.value);
+      var h = '<option value="">（不指定）</option>';
+      for (var i = 0; i < list.length; i++) {
+        h += '<option value="' + list[i] + '"' + (q.section === list[i] ? ' selected' : '') + '>' + list[i] + '</option>';
+      }
+      secSel.innerHTML = h;
+    }
+
+    function rebuild() {
+      var s = curSubj();
+      chSel.innerHTML = chapterOptionsHtml(s);
+      if (q.chapter) chSel.value = q.chapter;
+      fillSec();
+      var isMath = s === '数学';
+      if (chLabel) chLabel.textContent = isMath ? '板块' : '章节';
+      if (secLabel) secLabel.textContent = isMath ? '知识点' : '小节';
+    }
+
+    chSel.addEventListener('change', fillSec);
+    if (form.subject) form.subject.addEventListener('change', rebuild);
+    rebuild();
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var btn = document.getElementById('editSubmit');
+      btn.disabled = true;
+      var data = {
+        stem: form.stem.value.trim(),
+        my_answer: form.my_answer.value.trim(),
+        correct_answer: form.correct_answer.value.trim(),
+        analysis: form.analysis.value.trim(),
+        error_type: form.error_type.value,
+        level: form.level.value,
+        chapter: chSel.value,
+        section: secSel.value,
+        source: form.source.value.trim(),
+        subject: curSubj()
+      };
+      rpc('teacher_update_question', { p_token: S.token, p_id: q.id, p_data: data })
+        .then(function () {
+          closeModal();
+          return refreshCurrent();
+        })
+        .then(function () { toast('已保存'); })
+        .catch(function (err) {
+          toast(friendly(err), 'err');
+          btn.disabled = false;
+        });
     });
   }
 
@@ -1567,6 +1663,7 @@ input[type=file]{padding:8px;background:#fafafa}
       if (a === 'review') { doReview(el.getAttribute('data-id'), el.getAttribute('data-result')); return; }
       if (a === 'set-status') { doSetStatus(el.getAttribute('data-id'), el.getAttribute('data-status')); return; }
       if (a === 'del-q') { var dq = qById(el.getAttribute('data-id')); if (dq) openDeleteConfirm(dq); return; }
+      if (a === 'edit-q') { openEditQuestion(qById(el.getAttribute('data-id'))); return; }
       if (a === 'del-q-confirm') { doDeleteQuestion(el.getAttribute('data-id')); return; }
       if (a === 'change-pin') { openChangePin(); return; }
       if (a === 'toggle-active') { doToggleActive(el.getAttribute('data-id'), el.getAttribute('data-active') === '1'); return; }
