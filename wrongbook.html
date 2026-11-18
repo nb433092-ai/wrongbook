@@ -121,10 +121,18 @@ input[type=file]{padding:8px;background:#fafafa}
 .checks{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:10px;padding:10px;max-height:240px;overflow:auto;background:#fafafa}
 .check{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text);margin:0;cursor:pointer}
 .check input{width:auto;margin:0;flex:none}
-.crop-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-top:10px}
-.crop-grid label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:0}
-.crop-grid input[type=range]{flex:1;padding:0}
-.crop-grid .pct{width:34px;text-align:right;font-variant-numeric:tabular-nums}
+#cropStage{position:relative;display:inline-block;max-width:100%;border-radius:10px;overflow:hidden;margin-top:10px;touch-action:none;user-select:none;-webkit-user-select:none}
+#cropImg{max-width:100%;max-height:52vh;display:block}
+#cropRect{position:absolute;border:2px solid #2563eb;box-sizing:border-box;touch-action:none;cursor:move}
+.ch{position:absolute;width:24px;height:24px;background:#2563eb;border:2px solid #fff;border-radius:6px;box-sizing:border-box;touch-action:none}
+.ch[data-h=nw]{left:-12px;top:-12px;cursor:nwse-resize}
+.ch[data-h=ne]{right:-12px;top:-12px;cursor:nesw-resize}
+.ch[data-h=sw]{left:-12px;bottom:-12px;cursor:nesw-resize}
+.ch[data-h=se]{right:-12px;bottom:-12px;cursor:nwse-resize}
+.ch[data-h=n]{left:50%;margin-left:-12px;top:-12px;cursor:ns-resize}
+.ch[data-h=s]{left:50%;margin-left:-12px;bottom:-12px;cursor:ns-resize}
+.ch[data-h=w]{top:50%;margin-top:-12px;left:-12px;cursor:ew-resize}
+.ch[data-h=e]{top:50%;margin-top:-12px;right:-12px;cursor:ew-resize}
 .preview{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line)}
 
 /* 提示条 */
@@ -404,11 +412,15 @@ input[type=file]{padding:8px;background:#fafafa}
   function cropToCanvas(img, crop, maxSide) {
     var w = img.naturalWidth || img.width;
     var h = img.naturalHeight || img.height;
-    var c = crop || { top: 0, bottom: 0, left: 0, right: 0 };
-    var x0 = Math.round(w * (c.left || 0) / 100);
-    var y0 = Math.round(h * (c.top || 0) / 100);
-    var x1 = Math.round(w - w * (c.right || 0) / 100);
-    var y1 = Math.round(h - h * (c.bottom || 0) / 100);
+    var c = crop || { x0: 0, y0: 0, x1: 1, y1: 1 };
+    var nx0 = (c.x0 === undefined) ? 0 : c.x0;
+    var ny0 = (c.y0 === undefined) ? 0 : c.y0;
+    var nx1 = (c.x1 === undefined) ? 1 : c.x1;
+    var ny1 = (c.y1 === undefined) ? 1 : c.y1;
+    var x0 = Math.round(w * nx0);
+    var y0 = Math.round(h * ny0);
+    var x1 = Math.round(w * nx1);
+    var y1 = Math.round(h * ny1);
     var cw = Math.max(16, x1 - x0);
     var ch = Math.max(16, y1 - y0);
     var scale = Math.min(1, (maxSide || 1600) / Math.max(cw, ch));
@@ -869,14 +881,13 @@ input[type=file]{padding:8px;background:#fafafa}
       '</select>';
     html += '<label>题目照片（可选）</label><input type="file" name="photo" accept="image/*">';
     html += '<div id="cropBox" style="display:none">';
-    html += '<canvas id="cropPreview" style="width:100%;border-radius:10px;margin-top:10px;border:1px solid #e5e7eb;display:block"></canvas>';
-    html += '<div class="crop-grid">';
-    html += '<label>上 <input type="range" id="crop-top" min="0" max="40" value="0"><span class="pct" id="pct-top">0%</span></label>';
-    html += '<label>下 <input type="range" id="crop-bottom" min="0" max="40" value="0"><span class="pct" id="pct-bottom">0%</span></label>';
-    html += '<label>左 <input type="range" id="crop-left" min="0" max="40" value="0"><span class="pct" id="pct-left">0%</span></label>';
-    html += '<label>右 <input type="range" id="crop-right" min="0" max="40" value="0"><span class="pct" id="pct-right">0%</span></label>';
-    html += '</div>';
-    html += '<div class="muted small" style="margin-top:6px">拖滑块裁掉旁边多余的题，只留要录的这道。<button type="button" class="btn tiny" id="cropReset" style="margin-left:8px">重置</button></div>';
+    html += '<div id="cropStage">';
+    html += '<img id="cropImg" alt="" draggable="false">';
+    html += '<div id="cropRect">';
+    html += '<i class="ch" data-h="nw"></i><i class="ch" data-h="ne"></i><i class="ch" data-h="sw"></i><i class="ch" data-h="se"></i>';
+    html += '<i class="ch" data-h="n"></i><i class="ch" data-h="s"></i><i class="ch" data-h="w"></i><i class="ch" data-h="e"></i>';
+    html += '</div></div>';
+    html += '<div class="muted small" style="margin-top:8px">拖动方框选定要保留的范围，拖四角或四边调整大小。<button type="button" class="btn tiny" id="cropReset" style="margin-left:8px">重置</button></div>';
     html += '</div>';
     html += '<div id="photoPreview"></div>';
     html += '<label>题干</label><textarea name="stem" rows="3" placeholder="文字题干，只拍照不写也行"></textarea>';
@@ -930,41 +941,74 @@ input[type=file]{padding:8px;background:#fafafa}
     fillSections();
     refreshLabels();
 
-    var cropState = { top: 0, bottom: 0, left: 0, right: 0 };
+    var cropState = { x0: 0, y0: 0, x1: 1, y1: 1 };
     var imgEl = null;
+    var stage = document.getElementById('cropStage');
+    var cropImg = document.getElementById('cropImg');
+    var cropRect = document.getElementById('cropRect');
 
-    function drawCropPreview() {
-      if (!imgEl) return;
-      var c = cropToCanvas(imgEl, cropState, 600);
-      var pv = document.getElementById('cropPreview');
-      if (!pv) return;
-      pv.width = c.width;
-      pv.height = c.height;
-      pv.getContext('2d').drawImage(c, 0, 0);
+    function layoutRect() {
+      if (!stage || !cropRect) return;
+      var W = stage.clientWidth, H = stage.clientHeight;
+      cropRect.style.left = (cropState.x0 * W) + 'px';
+      cropRect.style.top = (cropState.y0 * H) + 'px';
+      cropRect.style.width = Math.max(12, (cropState.x1 - cropState.x0) * W) + 'px';
+      cropRect.style.height = Math.max(12, (cropState.y1 - cropState.y0) * H) + 'px';
     }
 
-    ['top', 'bottom', 'left', 'right'].forEach(function (k) {
-      var sl = document.getElementById('crop-' + k);
-      var pct = document.getElementById('pct-' + k);
-      if (!sl) return;
-      sl.addEventListener('input', function () {
-        cropState[k] = Number(sl.value);
-        if (pct) pct.textContent = sl.value + '%';
-        drawCropPreview();
+    var drag = null;
+    var MIN = 0.06;
+
+    if (stage) {
+      stage.addEventListener('pointerdown', function (e) {
+        if (!imgEl) return;
+        var h = e.target && e.target.getAttribute ? e.target.getAttribute('data-h') : null;
+        var isBody = (e.target === cropRect);
+        if (!h && !isBody) return;
+        drag = {
+          h: h || 'move',
+          sx: e.clientX, sy: e.clientY,
+          c: { x0: cropState.x0, y0: cropState.y0, x1: cropState.x1, y1: cropState.y1 }
+        };
+        try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
       });
-    });
+
+      stage.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        var W = stage.clientWidth || 1, H = stage.clientHeight || 1;
+        var dx = (e.clientX - drag.sx) / W;
+        var dy = (e.clientY - drag.sy) / H;
+        var c = { x0: drag.c.x0, y0: drag.c.y0, x1: drag.c.x1, y1: drag.c.y1 };
+        if (drag.h === 'move') {
+          var w = c.x1 - c.x0, hh = c.y1 - c.y0;
+          var nx = Math.min(Math.max(0, c.x0 + dx), 1 - w);
+          var ny = Math.min(Math.max(0, c.y0 + dy), 1 - hh);
+          c.x0 = nx; c.x1 = nx + w;
+          c.y0 = ny; c.y1 = ny + hh;
+        } else {
+          var hcode = drag.h;
+          if (hcode.indexOf('w') >= 0) c.x0 = Math.min(Math.max(0, c.x0 + dx), c.x1 - MIN);
+          if (hcode.indexOf('e') >= 0) c.x1 = Math.max(Math.min(1, c.x1 + dx), c.x0 + MIN);
+          if (hcode.indexOf('n') >= 0) c.y0 = Math.min(Math.max(0, c.y0 + dy), c.y1 - MIN);
+          if (hcode.indexOf('s') >= 0) c.y1 = Math.max(Math.min(1, c.y1 + dy), c.y0 + MIN);
+        }
+        cropState = c;
+        layoutRect();
+        e.preventDefault();
+      });
+
+      var endDrag = function () { drag = null; };
+      stage.addEventListener('pointerup', endDrag);
+      stage.addEventListener('pointercancel', endDrag);
+      window.addEventListener('resize', layoutRect);
+    }
 
     var resetBtn = document.getElementById('cropReset');
     if (resetBtn) {
       resetBtn.addEventListener('click', function () {
-        ['top', 'bottom', 'left', 'right'].forEach(function (k) {
-          cropState[k] = 0;
-          var sl = document.getElementById('crop-' + k);
-          var pct = document.getElementById('pct-' + k);
-          if (sl) sl.value = 0;
-          if (pct) pct.textContent = '0%';
-        });
-        drawCropPreview();
+        cropState = { x0: 0, y0: 0, x1: 1, y1: 1 };
+        layoutRect();
       });
     }
 
@@ -978,15 +1022,13 @@ input[type=file]{padding:8px;background:#fafafa}
       }
       loadImage(file).then(function (img) {
         imgEl = img;
-        cropState = { top: 0, bottom: 0, left: 0, right: 0 };
-        ['top', 'bottom', 'left', 'right'].forEach(function (k) {
-          var sl = document.getElementById('crop-' + k);
-          var pct = document.getElementById('pct-' + k);
-          if (sl) sl.value = 0;
-          if (pct) pct.textContent = '0%';
-        });
+        cropState = { x0: 0, y0: 0, x1: 1, y1: 1 };
+        if (cropImg) {
+          cropImg.onload = layoutRect;
+          cropImg.src = URL.createObjectURL(file);
+        }
         if (box) box.style.display = '';
-        drawCropPreview();
+        setTimeout(layoutRect, 80);
       }).catch(function (err) { toast(friendly(err), 'err'); });
     });
 
