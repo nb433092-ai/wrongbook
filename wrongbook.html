@@ -133,7 +133,27 @@ input[type=file]{padding:8px;background:#fafafa}
 .ch[data-h=s]{left:50%;margin-left:-12px;bottom:-12px;cursor:ns-resize}
 .ch[data-h=w]{top:50%;margin-top:-12px;left:-12px;cursor:ew-resize}
 .ch[data-h=e]{top:50%;margin-top:-12px;right:-12px;cursor:ew-resize}
-.preview{width:100%;border-radius:12px;margin-top:10px;border:1px solid var(--line)}
+.paper{background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px 28px;margin-top:14px}
+.paper h1{font-size:22px;text-align:center;margin:0 0 6px}
+.paper .paper-sub{text-align:center;color:var(--muted);font-size:13px;margin-bottom:14px}
+.paper-meta{display:flex;gap:18px;font-size:14px;color:#374151;border-bottom:1px dashed #d1d5db;padding-bottom:10px;margin-bottom:18px;flex-wrap:wrap}
+.q-item{margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid #f0f0f0}
+.q-item:last-child{border-bottom:none}
+.q-head{display:flex;gap:8px;align-items:flex-start}
+.q-no{font-weight:600;flex:none;min-width:26px}
+.q-stem{flex:1;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.q-photo{max-width:100%;max-height:70mm;border-radius:8px;margin:8px 0 0 34px;border:1px solid #eee;display:block}
+.q-blank{margin-left:34px;border:none}
+.q-ans{margin:10px 0 0 34px;background:#f8fafc;border-left:3px solid #93c5fd;padding:8px 12px;font-size:14px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.q-ans b{color:#1d4ed8}
+@media print{
+  .topbar,.fab,.no-print,.modal-backdrop{display:none!important}
+  body{background:#fff}
+  .paper{border:none;border-radius:0;padding:0;margin:0}
+  .wrap{padding:0!important;max-width:none}
+  .q-item{page-break-inside:avoid}
+}
+@page{size:A4;margin:16mm}
 
 /* 提示条 */
 .toast{
@@ -290,6 +310,11 @@ input[type=file]{padding:8px;background:#fafafa}
     filterStatus: 'all',
     loginRole: 'student',
     subject: '物理',
+    sel: {},
+    pf: { student: '', level: '', status: '', chapter: '', onlyAnswered: false },
+    paperTitle: '',
+    paperWithAnswer: false,
+    paperBlank: '中',
   };
 
   // ====== 基础工具 ======
@@ -711,6 +736,7 @@ input[type=file]{padding:8px;background:#fafafa}
     html += '<div class="topbar"><div><strong>' + esc(me.name || me.code || '教师端') + '</strong> <span class="chip">' + esc(subjLabel) + '</span></div>';
     html += '<div class="right">';
     html += '<button class="btn tiny primary" data-action="bulk-add">批量加题</button>';
+    html += '<button class="btn tiny" data-action="open-paper">组卷</button>';
     if (isOwner()) {
       html += '<button class="btn tiny" data-action="new-student">新建学生</button>';
       html += '<button class="btn tiny" data-action="teacher-admin">老师</button>';
@@ -1643,6 +1669,156 @@ input[type=file]{padding:8px;background:#fafafa}
     render();
   }
 
+  // ====== 组卷 ======
+  function openPaper() {
+    S.sel = {};
+    S.pf = { student: '', level: '', status: '', chapter: '', onlyAnswered: false };
+    S.view = 'paper';
+    render();
+  }
+
+  function paperPool() {
+    var qs = (S.questions || []).slice();
+    var f = S.pf;
+    return qs.filter(function (q) {
+      if (f.level && q.level !== f.level) return false;
+      if (f.status && q.status !== f.status) return false;
+      if (f.chapter && q.chapter !== f.chapter) return false;
+      if (f.onlyAnswered && !(q.correct_answer || q.analysis)) return false;
+      if (f.student && String(q.student_id) !== String(f.student)) return false;
+      return true;
+    });
+  }
+
+  function renderPaper() {
+    var pool = paperPool();
+    var chapters = {};
+    (S.questions || []).forEach(function (q) { if (q.chapter) chapters[q.chapter] = 1; });
+    var chNames = Object.keys(chapters).sort();
+
+    var picked = 0;
+    for (var k in S.sel) { if (S.sel[k]) picked++; }
+
+    var html = '';
+    html += '<div class="topbar">';
+    html += '<button class="btn tiny" data-action="back-teacher">← 返回</button>';
+    html += '<strong>组卷</strong>';
+    html += '<div class="right"><button class="btn tiny primary" data-action="make-paper">生成试卷</button></div>';
+    html += '</div>';
+
+    html += '<div class="wrap">';
+    html += '<div class="card" style="margin-bottom:14px">';
+    html += '<label>学生</label><select data-filter="student"><option value="">全部学生</option>' +
+      (S.students || []).map(function (st) {
+        return '<option value="' + st.id + '"' + (String(S.pf.student) === String(st.id) ? ' selected' : '') + '>' +
+          esc(st.code) + (st.name ? ' ' + esc(st.name) : '') + '</option>';
+      }).join('') + '</select>';
+    html += '<label>章节 / 板块</label><select data-filter="chapter"><option value="">全部</option>' +
+      chNames.map(function (c) {
+        return '<option value="' + esc(c) + '"' + (S.pf.chapter === c ? ' selected' : '') + '>' + esc(c) + '</option>';
+      }).join('') + '</select>';
+    html += '<div class="row2"><div><label>难度</label><select data-filter="level"><option value="">全部</option>' +
+      ['基础', '提升', '拔尖'].map(function (v) { return '<option value="' + v + '"' + (S.pf.level === v ? ' selected' : '') + '>' + v + '</option>'; }).join('') +
+      '</select></div><div><label>状态</label><select data-filter="status"><option value="">全部</option>' +
+      ['未掌握', '复习中', '已掌握'].map(function (v) { return '<option value="' + v + '"' + (S.pf.status === v ? ' selected' : '') + '>' + v + '</option>'; }).join('') +
+      '</select></div></div>';
+    html += '<label class="check" style="margin-top:12px"><input type="checkbox" data-filter="onlyAnswered"' + (S.pf.onlyAnswered ? ' checked' : '') + '>只显示有答案或解析的题</label>';
+    html += '</div>';
+
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin:6px 0 10px">';
+    html += '<span class="muted small">候选 ' + pool.length + ' 道，已选 <b id="selCount">' + picked + '</b> 道</span>';
+    html += '<span><button class="btn tiny" data-action="sel-all">全选建议</button> <button class="btn tiny" data-action="sel-none">清空</button></span>';
+    html += '</div>';
+
+    html += pool.length ? pool.map(function (q) {
+      var on = !!S.sel[q.id];
+      return '<label class="qcard" style="cursor:pointer' + (on ? ';border-color:#2563eb' : '') + '">' +
+        '<input type="checkbox" data-action="sel" data-id="' + q.id + '"' + (on ? ' checked' : '') + ' style="width:auto;margin-top:4px">' +
+        (q.image_path ? '<img class="thumb" loading="lazy" src="' + esc(imgUrl(thumbPathOf(q.image_path))) + '" onerror="this.onerror=null;this.src=\'' + esc(imgUrl(q.image_path)) + '\'" alt="">' : '') +
+        '<div class="qbody"><div class="qtext">' + esc(q.stem || '（图片题）') + '</div>' +
+        '<div class="chips">' +
+          (q.chapter ? '<span class="chip">' + esc(q.chapter) + '</span>' : '') +
+          (q.level ? '<span class="chip">' + esc(q.level) + '</span>' : '') +
+          (q.status ? '<span class="chip ' + statusClass(q.status) + '">' + esc(q.status) + '</span>' : '') +
+          ((q.correct_answer || q.analysis) ? '<span class="chip ok">有解析</span>' : '<span class="chip bad">无解析</span>') +
+        '</div></div></label>';
+    }).join('') : '<div class="empty">没有符合条件的题。</div>';
+
+    html += '</div>';
+    app.innerHTML = html;
+  }
+
+  function doBuildPaper() {
+    var t = document.getElementById('paperTitle');
+    var v = document.getElementById('paperVer');
+    var b = document.getElementById('paperBlank');
+    S.paperTitle = (t && t.value.trim()) || '错题重练';
+    S.paperWithAnswer = !!(v && v.value === 'teacher');
+    S.paperBlank = (b && b.value) || '中';
+    closeModal();
+    S.view = 'paperDoc';
+    renderPaperDoc();
+  }
+
+  function doSelAll() {
+    paperPool().forEach(function (q) { S.sel[q.id] = true; });
+    renderPaper();
+  }
+
+  function openMakePaper() {
+    var ids = [];
+    for (var k in S.sel) { if (S.sel[k]) ids.push(k); }
+    if (!ids.length) { toast('先勾选题目', 'err'); return; }
+
+    var html = '';
+    html += '<div class="modal-head"><h3>生成试卷</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<label>试卷标题</label><input id="paperTitle" value="' + esc(S.paperTitle || '错题重练') + '">';
+    html += '<label>版本</label><select id="paperVer"><option value="student">学生版（无答案）</option><option value="teacher">教师版（含答案解析）</option></select>';
+    html += '<label>每题留白</label><select id="paperBlank"><option value="无">不留白</option><option value="小">小</option><option value="中" selected>中</option><option value="大">大</option></select>';
+    html += '<button class="btn primary block" data-action="paper-build">生成</button>';
+    showModal(html);
+  }
+
+  function renderPaperDoc() {
+    var ids = [];
+    for (var k in S.sel) { if (S.sel[k]) ids.push(k); }
+    var qs = (S.questions || []).filter(function (q) { return ids.indexOf(q.id) >= 0; });
+    if (!qs.length) { S.view = 'paper'; render(); return; }
+
+    var blankH = { '无': 0, '小': 90, '中': 150, '大': 230 }[S.paperBlank] || 0;
+
+    var html = '';
+    html += '<div class="topbar no-print">';
+    html += '<button class="btn tiny" data-action="back-paper">← 返回调整</button>';
+    html += '<strong>试卷预览</strong>';
+    html += '<div class="right"><button class="btn tiny primary" data-action="do-print">打印 / 存 PDF</button></div>';
+    html += '</div>';
+    html += '<div class="wrap"><div class="paper">';
+    html += '<h1>' + esc(S.paperTitle || '错题重练') + '</h1>';
+    html += '<div class="paper-sub">共 ' + qs.length + ' 题' + (S.paperWithAnswer ? '（教师版）' : '') + '</div>';
+    html += '<div class="paper-meta"><span>姓名：____________</span><span>日期：____________</span><span>得分：__________</span></div>';
+
+    qs.forEach(function (q, i) {
+      html += '<div class="q-item">';
+      html += '<div class="q-head"><div class="q-no">' + (i + 1) + '.</div><div class="q-stem">' + esc(q.stem || '') + '</div></div>';
+      if (q.image_path) {
+        html += '<img class="q-photo" src="' + esc(imgUrl(q.image_path)) + '" alt="">';
+      }
+      if (blankH) html += '<div class="q-blank" style="height:' + blankH + 'px"></div>';
+      if (S.paperWithAnswer) {
+        html += '<div class="q-ans">';
+        if (q.correct_answer) html += '<b>答案：</b>' + esc(q.correct_answer) + '\n';
+        if (q.analysis) html += '<b>解析：</b>' + esc(q.analysis);
+        if (!q.correct_answer && !q.analysis) html += '<span class="muted">（这道题还没有答案和解析）</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+
+    html += '</div></div>';
+    app.innerHTML = html;
+  }
+
   // ====== 事件委托 ======
   document.addEventListener('click', function (e) {
     var el = e.target.closest ? e.target.closest('[data-action]') : null;
@@ -1683,6 +1859,13 @@ input[type=file]{padding:8px;background:#fafafa}
       if (a === 'reset-tpin') { openResetTeacherPin(el.getAttribute('data-id'), el.getAttribute('data-code')); return; }
       if (a === 'toggle-teacher') { doToggleTeacher(el.getAttribute('data-id'), el.getAttribute('data-active') === '1'); return; }
       if (a === 'save-name') { doSaveStudentName(el.getAttribute('data-id')); return; }
+      if (a === 'open-paper') { openPaper(); return; }
+      if (a === 'back-paper') { S.view = 'paper'; render(); return; }
+      if (a === 'make-paper') { openMakePaper(); return; }
+      if (a === 'paper-build') { doBuildPaper(); return; }
+      if (a === 'sel-all') { doSelAll(); return; }
+      if (a === 'sel-none') { S.sel = {}; renderPaper(); return; }
+      if (a === 'do-print') { window.print(); return; }
     } catch (err) {
       toast(friendly(err), 'err');
     }
@@ -1690,7 +1873,29 @@ input[type=file]{padding:8px;background:#fafafa}
 
   document.addEventListener('change', function (e) {
     var el = e.target;
-    if (!el || !el.getAttribute || el.getAttribute('data-action') !== 'assign') return;
+    if (!el || !el.getAttribute) return;
+    var act = el.getAttribute('data-action');
+    if (act === 'sel') {
+      var qid = el.getAttribute('data-id');
+      S.sel[qid] = el.checked;
+      var c = document.getElementById('selCount');
+      if (c) {
+        var n = 0;
+        for (var kk in S.sel) { if (S.sel[kk]) n++; }
+        c.textContent = n;
+      }
+      var card = el.closest ? el.closest('.qcard') : null;
+      if (card) card.style.borderColor = el.checked ? '#2563eb' : '';
+      return;
+    }
+    var fk = el.getAttribute('data-filter');
+    if (fk) {
+      if (fk === 'onlyAnswered') S.pf[fk] = el.checked;
+      else S.pf[fk] = el.value;
+      if (S.view === 'paper') renderPaper();
+      return;
+    }
+    if (act !== 'assign') return;
     rpc('assign_student', {
       p_token: S.token,
       p_student_id: Number(el.getAttribute('data-sid')),
@@ -1711,6 +1916,8 @@ input[type=file]{padding:8px;background:#fafafa}
     if (S.view === 'student') return renderStudent();
     if (S.view === 'teacher') return renderTeacher();
     if (S.view === 'teacherStudent') return renderTeacherStudent();
+    if (S.view === 'paper') return renderPaper();
+    if (S.view === 'paperDoc') return renderPaperDoc();
     return renderLogin();
   }
 
