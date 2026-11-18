@@ -625,6 +625,7 @@ input[type=file]{padding:8px;background:#fafafa}
           '<div class="scard-actions">' +
             '<button class="btn tiny" data-action="open-student" data-id="' + st.id + '">看错题</button>' +
             '<button class="btn tiny primary" data-action="add-q" data-student-id="' + st.id + '">加题</button>' +
+            '<button class="btn tiny" data-action="rename-student" data-id="' + st.id + '" data-code="' + esc(st.code) + '" data-name="' + esc(st.name || '') + '">改名</button>' +
             '<button class="btn tiny" data-action="reset-pin" data-id="' + st.id + '" data-code="' + esc(st.code) + '">改口令</button>' +
           '</div></div>';
       }).join('');
@@ -974,6 +975,35 @@ input[type=file]{padding:8px;background:#fafafa}
   }
 
   // ====== 重置学生口令 ======
+  function openRenameStudent(studentId, code, currentName) {
+    var html = '';
+    html += '<div class="modal-head"><h3>改 ' + esc(code) + ' 的名字</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
+    html += '<form id="renameForm" autocomplete="off">';
+    html += '<label>姓名</label><input name="name" value="' + esc(currentName || '') + '" placeholder="填真实姓名">';
+    html += '<button class="btn primary block" type="submit">保存</button>';
+    html += '</form>';
+    showModal(html);
+
+    var form = document.getElementById('renameForm');
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = form.name.value.trim();
+      if (!name) { toast('名字不能为空', 'err'); return; }
+      var btn = form.querySelector('button[type=submit]');
+      btn.disabled = true;
+      rpc('teacher_update_student', { p_token: S.token, p_student_id: Number(studentId), p_name: name })
+        .then(function () {
+          closeModal();
+          return refreshCurrent();
+        })
+        .then(function () { toast('名字已改'); })
+        .catch(function (err) {
+          toast(friendly(err), 'err');
+          btn.disabled = false;
+        });
+    });
+  }
+
   function openResetPin(studentId, code) {
     var html = '';
     html += '<div class="modal-head"><h3>改 ' + esc(code) + ' 的口令</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
@@ -1075,6 +1105,7 @@ input[type=file]{padding:8px;background:#fafafa}
       if (a === 'del-q') { var dq = qById(el.getAttribute('data-id')); if (dq) openDeleteConfirm(dq); return; }
       if (a === 'del-q-confirm') { doDeleteQuestion(el.getAttribute('data-id')); return; }
       if (a === 'change-pin') { openChangePin(); return; }
+      if (a === 'rename-student') { openRenameStudent(el.getAttribute('data-id'), el.getAttribute('data-code'), el.getAttribute('data-name')); return; }
       if (a === 'new-student') { openNewStudent(); return; }
       if (a === 'reset-pin') { openResetPin(el.getAttribute('data-id'), el.getAttribute('data-code')); return; }
       if (a === 'open-student') { openStudentView(Number(el.getAttribute('data-id'))); return; }
