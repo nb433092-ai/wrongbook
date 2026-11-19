@@ -153,6 +153,28 @@ input[type=file]{padding:8px;background:#fafafa}
   .wrap{padding:0!important;max-width:none}
   .q-item{page-break-inside:avoid}
 }
+/* 标准错题集版式 */
+.paper-std{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px 26px;margin-top:14px;color:#111827}
+.paper-std .ph{display:flex;justify-content:space-between;font-size:12px;color:#6b7280;border-bottom:1px solid #e5e7eb;padding-bottom:6px;margin-bottom:16px}
+.paper-std .ptitle{text-align:center;font-size:19px;font-weight:700;letter-spacing:1px;margin:4px 0 20px}
+.paper-std .ptitle em{font-style:normal;color:#b45309}
+.paper-std .pmeta{display:flex;gap:20px;font-size:13px;color:#374151;border-bottom:1px dashed #d1d5db;padding-bottom:8px;margin-bottom:16px;flex-wrap:wrap}
+.paper-std .qitem{margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #f3f4f6;page-break-inside:avoid}
+.paper-std .qline{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.paper-std .qtag{background:#374151;color:#fff;font-size:12px;padding:2px 9px;border-radius:4px;flex:none;line-height:1.6}
+.paper-std .qsrc{color:#6b7280;font-size:12px;padding-top:3px}
+.paper-std .qstem{margin-top:6px;line-height:1.75;white-space:pre-wrap;word-break:break-word}
+.paper-std .qphoto{max-width:100%;max-height:80mm;margin:8px 0;border:1px solid #eee;border-radius:6px;display:block}
+.paper-std .qblank{border-bottom:0}
+.paper-std .ans-title{text-align:center;font-size:18px;font-weight:700;margin:0 0 16px;color:#b45309}
+.paper-std .ans-wrap{column-count:2;column-gap:26px}
+.paper-std .ans-item{break-inside:avoid;margin-bottom:14px;font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.paper-std .ans-item b{color:#1d4ed8}
+.paper-std .pagefoot{text-align:center;color:#9ca3af;font-size:12px;margin-top:22px}
+@media print{
+  .paper-std{border:none;border-radius:0;padding:0;margin:0}
+  .paper-std .ans-break{page-break-before:always}
+}
 @page{size:A4;margin:16mm}
 
 /* 提示条 */
@@ -315,6 +337,7 @@ input[type=file]{padding:8px;background:#fafafa}
     paperTitle: '',
     paperWithAnswer: false,
     paperBlank: '中',
+    paperTemplate: 'std',
   };
 
   // ====== 基础工具 ======
@@ -1752,9 +1775,11 @@ input[type=file]{padding:8px;background:#fafafa}
     var t = document.getElementById('paperTitle');
     var v = document.getElementById('paperVer');
     var b = document.getElementById('paperBlank');
+    var lay = document.getElementById('paperLayout');
     S.paperTitle = (t && t.value.trim()) || '错题重练';
     S.paperWithAnswer = !!(v && v.value === 'teacher');
     S.paperBlank = (b && b.value) || '中';
+    S.paperTemplate = (lay && lay.value) || 'std';
     closeModal();
     S.view = 'paperDoc';
     renderPaperDoc();
@@ -1773,10 +1798,60 @@ input[type=file]{padding:8px;background:#fafafa}
     var html = '';
     html += '<div class="modal-head"><h3>生成试卷</h3><button class="btn tiny" data-action="close-modal">关闭</button></div>';
     html += '<label>试卷标题</label><input id="paperTitle" value="' + esc(S.paperTitle || '错题重练') + '">';
+    html += '<label>版式</label><select id="paperLayout"><option value="std"' + (S.paperTemplate === 'std' ? ' selected' : '') + '>标准错题集（带页眉、原错题N、参考答案页）</option><option value="simple"' + (S.paperTemplate === 'simple' ? ' selected' : '') + '>简约（只有题目和留白）</option></select>';
     html += '<label>版本</label><select id="paperVer"><option value="student">学生版（无答案）</option><option value="teacher">教师版（含答案解析）</option></select>';
     html += '<label>每题留白</label><select id="paperBlank"><option value="无">不留白</option><option value="小">小</option><option value="中" selected>中</option><option value="大">大</option></select>';
     html += '<button class="btn primary block" data-action="paper-build">生成</button>';
     showModal(html);
+  }
+
+  function renderPaperStd(qs) {
+    var blankH = { '无': 0, '小': 90, '中': 150, '大': 230 }[S.paperBlank] || 0;
+    var who = (S.profile && (S.profile.name || S.profile.code)) || '';
+    var d = new Date();
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    var dateStr = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+
+    var html = '';
+    html += '<div class="topbar no-print">';
+    html += '<button class="btn tiny" data-action="back-paper">← 返回调整</button>';
+    html += '<strong>试卷预览</strong>';
+    html += '<div class="right"><button class="btn tiny primary" data-action="do-print">打印 / 存 PDF</button></div>';
+    html += '</div>';
+    html += '<div class="wrap"><div class="paper-std">';
+    html += '<div class="ph"><span>' + esc(who) + ' · 错题集</span><span>共 ' + qs.length + ' 题</span></div>';
+    html += '<div class="ptitle"><em>◆</em> ' + esc(S.paperTitle || '错题集') + ' <em>◆</em></div>';
+    if (!S.paperWithAnswer) {
+      html += '<div class="pmeta"><span>姓名：____________</span><span>日期：____________</span><span>得分：__________</span></div>';
+    }
+
+    qs.forEach(function (q, i) {
+      html += '<div class="qitem">';
+      html += '<div class="qline"><span class="qtag">原错题' + (i + 1) + '</span>' +
+        (q.source ? '<span class="qsrc">（题目来源：' + esc(q.source) + '）</span>' : '') + '</div>';
+      if (q.stem) html += '<div class="qstem">' + esc(q.stem) + '</div>';
+      if (q.image_path) html += '<img class="qphoto" src="' + esc(imgUrl(q.image_path)) + '" alt="">';
+      if (blankH) html += '<div class="qblank" style="height:' + blankH + 'px"></div>';
+      html += '</div>';
+    });
+
+    if (S.paperWithAnswer) {
+      html += '<div class="ans-break"></div>';
+      html += '<div class="ans-title">◆ 参考答案 ◆</div>';
+      html += '<div class="ans-wrap">';
+      qs.forEach(function (q, i) {
+        html += '<div class="ans-item"><b>原错题' + (i + 1) + '</b><br>';
+        if (q.correct_answer) html += '<b>【答案】</b>' + esc(q.correct_answer) + '<br>';
+        if (q.analysis) html += '<b>【解析】</b>' + esc(q.analysis);
+        if (!q.correct_answer && !q.analysis) html += '<span class="muted">（这道题还没有答案和解析）</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="pagefoot">' + esc(who) + ' · ' + dateStr + '</div>';
+    html += '</div></div>';
+    app.innerHTML = html;
   }
 
   function renderPaperDoc() {
@@ -1784,6 +1859,7 @@ input[type=file]{padding:8px;background:#fafafa}
     for (var k in S.sel) { if (S.sel[k]) ids.push(k); }
     var qs = (S.questions || []).filter(function (q) { return ids.indexOf(q.id) >= 0; });
     if (!qs.length) { S.view = 'paper'; render(); return; }
+    if (S.paperTemplate === 'std') return renderPaperStd(qs);
 
     var blankH = { '无': 0, '小': 90, '中': 150, '大': 230 }[S.paperBlank] || 0;
 
